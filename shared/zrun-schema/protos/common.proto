@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package zrun.common;
+
+// Empty message for operations with no input/output
+message Empty {}
+
+// Standard error response format
+message Error {
+  string code = 1;
+  string message = 2;
+}

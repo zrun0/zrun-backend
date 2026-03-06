@@ -1,0 +1,59 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "zrun-core"
+version = "0.1.0"
+description = "Core infrastructure library for zrun services"
+requires-python = ">=3.14"
+dependencies = [
+    "grpcio>=1.60.0,<2.0.0",
+    "redis[hiredis]>=5.0.0",
+    "cachetools>=5.0.0",
+    "httpx>=0.28.0",
+    "pyjwt>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "structlog>=25.0.0",
+    "python-dateutil>=2.0.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+]
+
+[tool.uv.sources]
+zrun-schema = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/zrun_core"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --strict-markers"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*"]
+
+[tool.mypy]
+strict = true
+warn_unreachable = true
+pretty = true
+show_column_numbers = true
+show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+strict = false
+
+[[tool.mypy.overrides]]
+module = ["grpc.*", "redis.*", "cachetools.*", "httpx.*"]
+ignore_missing_imports = true

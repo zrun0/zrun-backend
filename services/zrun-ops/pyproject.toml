@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "zrun-ops"
+version = "0.1.0"
+description = "Operations service for zrun"
+requires-python = ">=3.14"
+dependencies = [
+    "zrun-core",
+    "zrun-schema",
+]
+
+[tool.uv.sources]
+zrun-core = { workspace = true }
+zrun-schema = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/zrun_ops"]

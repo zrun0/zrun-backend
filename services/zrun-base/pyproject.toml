@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "zrun-base"
+version = "0.1.0"
+description = "Core business service for zrun"
+requires-python = ">=3.14"
+dependencies = [
+    "zrun-core",
+    "zrun-schema",
+    "asyncpg>=0.30.0",
+    "python-dateutil>=2.0.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "pytest-postgresql>=6.0.0",
+    "testcontainers>=4.0.0",
+]
+
+[project.scripts]
+zrun-base = "zrun_base.main:main"
+
+[tool.uv.sources]
+zrun-core = { workspace = true }
+zrun-schema = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/zrun_base"]
+
+[dependency-groups]
+dev = [
+    "grpcio-tools>=1.78.0",
+    "mypy>=1.19.1",
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.15.4",
+]

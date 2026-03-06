@@ -1,0 +1,54 @@
+# =============================================================================
+# buf.yaml - Buf Configuration
+# =============================================================================
+# See: https://buf.build/docs/configuration/v2/buf-yaml
+#
+# This configures linting and breaking change detection for proto files.
+
+# Version of the configuration schema
+version: v2
+
+# Module configuration - defines the root of the proto workspace
+modules:
+  - path: shared/zrun-schema/protos
+
+# Linting configuration - enforces style and best practices
+lint:
+  # Use the STANDARD category with sensible defaults
+  use:
+    - STANDARD
+
+  # Exclude specific rules that don't fit our style
+  except:
+    # Allow package names without version suffix (e.g., zrun.base.sku)
+    - PACKAGE_VERSION_SUFFIX
+    # Allow directory names to differ from proto package names
+    # Our structure: protos/base/sku.proto with package zrun.base.sku
+    - PACKAGE_DIRECTORY_MATCH
+    # We may have some imports without comments in internal files
+    - IMPORT_NO_PUBLIC
+    # Allow comment format flexibility
+    - COMMENT_ENUM
+    - COMMENT_ENUM_VALUE
+    - COMMENT_FIELD
+    - COMMENT_MESSAGE
+    - COMMENT_ONEOF
+    - COMMENT_RPC
+    - COMMENT_SERVICE
+
+# Breaking change detection - prevents incompatible API changes
+breaking:
+  use:
+    - FILE
+    - PACKAGE
+    - WIRE_JSON
+
+  # Ignore certain breaking changes for internal development
+  ignore_only:
+    # Allow adding fields to existing messages (safe for protobuf)
+    # Allow adding new RPCs to services
+    # Allow renaming files that don't affect public API
+
+# Dependencies - external protobuf dependencies (if needed)
+# deps:
+#   - buf.build/googleapis/googleapis

@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package zrun.base.sku;
+
+// SKU service for managing stock keeping units
+service SkuService {
+  // Create a new SKU
+  rpc CreateSku(CreateSkuRequest) returns (CreateSkuResponse);
+
+  // Get an existing SKU by ID
+  rpc GetSku(GetSkuRequest) returns (GetSkuResponse);
+
+  // List SKUs with pagination
+  rpc ListSkus(ListSkusRequest) returns (ListSkusResponse);
+
+  // Update an existing SKU
+  rpc UpdateSku(UpdateSkuRequest) returns (UpdateSkuResponse);
+
+  // Delete an SKU
+  rpc DeleteSku(DeleteSkuRequest) returns (DeleteSkuResponse);
+}
+
+// SKU entity
+message Sku {
+  string id = 1;
+  string code = 2;
+  string name = 3;
+  int64 created_at = 4;
+  int64 updated_at = 5;
+}
+
+// Create SKU request
+message CreateSkuRequest {
+  string code = 1;
+  string name = 2;
+}
+
+// Create SKU response
+message CreateSkuResponse {
+  Sku sku = 1;
+}
+
+// Get SKU request
+message GetSkuRequest {
+  string sku_id = 1;
+}
+
+// Get SKU response
+message GetSkuResponse {
+  Sku sku = 1;
+}
+
+// List SKUs request
+message ListSkusRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+// List SKUs response
+message ListSkusResponse {
+  repeated Sku skus = 1;
+  string next_page_token = 2;
+}
+
+// Update SKU request
+message UpdateSkuRequest {
+  string sku_id = 1;
+  string code = 2;
+  string name = 3;
+}
+
+// Update SKU response
+message UpdateSkuResponse {
+  Sku sku = 1;
+}
+
+// Delete SKU request
+message DeleteSkuRequest {
+  string sku_id = 1;
+}
+
+// Delete SKU response
+message DeleteSkuResponse {}
