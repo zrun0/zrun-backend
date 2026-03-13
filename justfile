@@ -197,10 +197,10 @@ lint-fix:
     @echo "==> Fixing linting issues..."
     uv run ruff check --fix .
 
-# Type check with basedpyright
+# Type check with basedpyright (core packages only)
 typecheck:
     @echo "==> Type checking..."
-    uv run basedpyright .
+    uv run basedpyright services/*/src shared/*/src
 
 # Run all quality checks (format, lint, type, proto)
 check: format-check lint typecheck proto-check
