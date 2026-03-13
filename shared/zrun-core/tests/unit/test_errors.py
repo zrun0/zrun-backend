@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextlib
+
 import grpc
 
 from zrun_core.errors import (
@@ -136,10 +138,8 @@ class TestAbortWithError:
         mock_context = _MockContext()
         error = ValidationError(message="Invalid input", code="VALIDATION")
 
-        try:
+        with contextlib.suppress(AssertionError):
             abort_with_error(mock_context, error)
-        except AssertionError:
-            pass  # Expected due to unreachable code
 
         assert mock_context.aborted
         assert mock_context.status_code == grpc.StatusCode.INVALID_ARGUMENT
@@ -151,10 +151,8 @@ class TestAbortWithError:
         mock_context = _MockContext()
         error = ValueError("Something broke")
 
-        try:
+        with contextlib.suppress(AssertionError):
             abort_with_error(mock_context, error)
-        except AssertionError:
-            pass  # Expected due to unreachable code
 
         assert mock_context.aborted
         assert mock_context.status_code == grpc.StatusCode.INTERNAL

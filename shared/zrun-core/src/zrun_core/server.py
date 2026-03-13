@@ -11,14 +11,147 @@ import grpc.aio
 import structlog
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Callable, Sequence
 
     from grpc.aio import Server
+    from sqlalchemy.ext.asyncio import AsyncEngine as Engine
 
+    from zrun_core.auth import AuthInterceptor
     from zrun_core.config import ServiceConfig
 
 
 logger = structlog.get_logger()
+
+
+def configure_service_logging(
+    service_name: str,
+    log_level: str,
+    log_format: str,
+) -> structlog.stdlib.BoundLogger:
+    """Configure structlog for a service and return a logger.
+
+    Args:
+        service_name: Name of the service.
+        log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL).
+        log_format: Log format (json or console).
+
+    Returns:
+        A configured bound logger instance.
+    """
+    from zrun_core.logging import configure_structlog, get_logger
+
+    configure_structlog(
+        service_name=service_name,
+        log_level=log_level,
+        log_format=log_format,
+    )
+
+    return get_logger()
+
+
+def create_auth_interceptor(
+    jwks_url: str,
+    audience: str,
+    issuer: str | None = None,
+) -> AuthInterceptor:  # type: ignore[name-defined]
+    """Create an authentication interceptor.
+
+    Args:
+        jwks_url: URL to fetch JWKS from.
+        audience: Expected JWT audience claim.
+        issuer: Expected JWT issuer claim (optional).
+
+    Returns:
+        Configured AuthInterceptor instance.
+    """
+    from zrun_core.auth import AuthInterceptor
+
+    return AuthInterceptor(
+        jwks_url=jwks_url,
+        audience=audience,
+        issuer=issuer,
+    )
+
+
+async def run_service(
+    servicers: Sequence[tuple[Callable[[object, Server], None], object]],  # type: ignore[name-defined]
+    config: ServiceConfig,
+    engine: Engine | None = None,  # type: ignore[name-defined]
+) -> int:
+    """Run a gRPC service with full lifecycle management.
+
+    This function handles:
+    - Logging configuration
+    - Interceptor setup (auth if enabled)
+    - Server creation and servicer registration
+    - Graceful shutdown on signals
+    - Engine disposal if provided
+
+    Args:
+        servicers: Sequence of (register_fn, servicer_instance) tuples.
+            register_fn is the gRPC add_*_servicer_to_server function.
+        config: Service configuration.
+        engine: Optional SQLAlchemy async engine to dispose on shutdown.
+
+    Returns:
+        Exit code (0 for success, non-zero for failure).
+    """
+    # Configure logging
+    service_logger = configure_service_logging(
+        service_name="zrun-service",
+        log_level=config.log_level,
+        log_format=config.log_format,
+    )
+
+    service_logger.info(
+        "service_starting",
+        env=config.env,
+        port=config.port,
+    )
+
+    # Build interceptors
+    interceptors: list[grpc.aio.ServerInterceptor] = []
+    if config.enable_auth:
+        auth_interceptor = create_auth_interceptor(
+            jwks_url=config.jwks_url,
+            audience=config.jwt_audience,
+            issuer=config.jwt_issuer,
+        )
+        interceptors.append(auth_interceptor)  # type: ignore[arg-type]
+
+    # Create and start server
+    server = BaseGrpcServer(
+        port=config.port,
+        interceptors=interceptors,
+        max_workers=config.max_workers,
+        service_config=config,
+    )
+
+    # Start the server to get the underlying gRPC server
+    await server.start()
+
+    # Register servicers
+    if server._server is not None:
+        for register_fn, servicer_instance in servicers:
+            register_fn(  # type: ignore[no-untyped-call]
+                servicer_instance,
+                server._server,
+            )
+
+    try:
+        await server.wait_for_termination()
+        return 0
+    except KeyboardInterrupt:
+        service_logger.info("service_interrupted")
+        return 0
+    except Exception:
+        service_logger.exception("service_error")
+        return 1
+    finally:
+        await server.stop()
+        if engine is not None:
+            await engine.dispose()
+        service_logger.info("service_stopped")
 
 
 class BaseGrpcServer:

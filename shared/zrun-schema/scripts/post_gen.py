@@ -12,41 +12,67 @@ import sys
 from pathlib import Path
 
 
-def rewrite_imports(content: str) -> tuple[str, int]:
+def rewrite_imports(content: str, relative_dir: Path) -> tuple[str, int]:
     """Rewrite imports in generated code.
 
     Args:
         content: The generated file content.
+        relative_dir: The relative directory from generated root (e.g., Path("base")).
 
     Returns:
         A tuple of (rewritten_content, number_of_rewrites).
     """
-    # Pattern to match: import xxx_pb2 as xxx_pb2
-    pattern = r"import (\w+_pb2) as (\w+_pb2)"
-    replacement = r"from zrun_schema.generated import \1 as \2"
+    total_count = 0
 
-    rewritten, count = re.subn(pattern, replacement, content)
+    # Build the import prefix based on the file's location
+    if relative_dir == Path():
+        import_prefix = "zrun_schema.generated"
+    else:
+        import_prefix = f"zrun_schema.generated.{relative_dir.as_posix().replace('/', '.')}"
 
-    # Also handle from . import xxx_pb2 as xxx_pb2
-    pattern2 = r"from \. import (\w+_pb2) as (\w+_pb2)"
-    rewritten2, count2 = re.subn(pattern2, replacement, rewritten)
+    # Pattern 1: "from . import xxx_pb2 as xxx_pb2" (relative import)
+    # Replace with: "from zrun_schema.generated import xxx_pb2 as xxx_pb2"
+    pattern1 = r"from \. import (\w+_pb2) as (\w+_pb2)"
+    replacement1 = r"from zrun_schema.generated import \1 as \2"
+    content, count1 = re.subn(pattern1, replacement1, content)
+    total_count += count1
 
-    return rewritten2, count + count2
+    # Pattern 2: "from subdir import xxx_pb2 as xxx_pb2" (e.g., "from base import sku_pb2")
+    # Replace with: "from zrun_schema.generated.subdir import xxx_pb2 as xxx_pb2"
+    pattern2 = r"from (\w+) import (\w+_pb2) as (\w+_pb2)"
+    replacement2 = r"from zrun_schema.generated.\1 import \2 as \3"
+    content, count2 = re.subn(pattern2, replacement2, content)
+    total_count += count2
+
+    # Pattern 3: "import xxx_pb2 as xxx_pb2" (standalone import)
+    # Replace with: "from zrun_schema.generated import xxx_pb2 as xxx_pb2"
+    pattern3 = r"^import (\w+_pb2) as (\w+_pb2)$"
+    replacement3 = rf"from {import_prefix} import \1 as \2"
+    content, count3 = re.subn(pattern3, replacement3, content, flags=re.MULTILINE)
+    total_count += count3
+
+    return content, total_count
 
 
-def process_file(file_path: Path) -> int:
+def process_file(file_path: Path, generated_dir: Path) -> int:
     """Process a single generated file.
 
     Args:
         file_path: Path to the file to process.
+        generated_dir: Path to the generated directory root.
 
     Returns:
         Number of rewrites performed.
     """
-    print(f"Processing {file_path.name}...")
+    # Calculate relative directory from generated root
+    relative_dir = file_path.parent.relative_to(generated_dir)
+    if relative_dir == Path():
+        relative_dir = Path()
+
+    print(f"Processing {file_path.relative_to(generated_dir)}...")
 
     content = file_path.read_text()
-    rewritten, count = rewrite_imports(content)
+    rewritten, count = rewrite_imports(content, relative_dir)
 
     if count > 0:
         file_path.write_text(rewritten)
@@ -78,6 +104,12 @@ def validate_imports(file_path: Path) -> bool:
         print(f"  ERROR: Found non-prefixed imports in {file_path.name}")
         return False
 
+    # Check for "from xxx import yyy_pb2" where xxx is not a known module
+    # (should be "from zrun_schema.generated.xxx import yyy_pb2")
+    if re.search(r"^from (?!zrun_schema)\w+ import \w+_pb2 as \w+_pb2$", content, re.MULTILINE):
+        print(f"  ERROR: Found non-absolute imports in {file_path.name}")
+        return False
+
     return True
 
 
@@ -90,8 +122,8 @@ def main() -> int:
         print(f"Error: Generated directory not found: {generated_dir}")
         return 1
 
-    # Find all _pb2_grpc.py files
-    grpc_files = list(generated_dir.glob("*_pb2_grpc.py"))
+    # Find all _pb2_grpc.py files (recursively, including subdirectories)
+    grpc_files = list(generated_dir.rglob("*_pb2_grpc.py"))
 
     if not grpc_files:
         print("No _pb2_grpc.py files found in generated directory")
@@ -104,7 +136,7 @@ def main() -> int:
     all_valid = True
 
     for grpc_file in grpc_files:
-        count = process_file(grpc_file)
+        count = process_file(grpc_file, generated_dir)
         total_rewrites += count
 
         if not validate_imports(grpc_file):

@@ -3,25 +3,20 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncGenerator, Generator
-from typing import TYPE_CHECKING
+from collections.abc import AsyncGenerator, Callable, Generator
+from contextlib import asynccontextmanager
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
+from sqlalchemy.pool import StaticPool
 
 from zrun_base.config import BaseServiceConfig
-from zrun_base.logic.sku import CreateSkuInput, SkuDomain, SkuLogic
-from zrun_base.repository.sqlite import (
-    SqliteSkuRepository,
-    get_in_memory_connection,
-)
-from zrun_base.repository.sqlite import (
-    create_sku_table as create_sqlite_table,
-)
+from zrun_base.logic.domain import CreateSkuInput, SkuDomain
+from zrun_base.logic.sku import SkuLogic
+from zrun_base.repository.repos import SkuRepository
+from zrun_base.repository.schema import create_sku_table
 from zrun_base.servicers.sku_servicer import SkuServicer
-from zrun_core import USER_ID_CTX_KEY
-
-if TYPE_CHECKING:
-    import sqlite3
+from zrun_core import USER_ID_CTX_KEY, get_async_session
 
 
 @pytest.fixture(scope="session")
@@ -33,37 +28,47 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop]:
 
 
 @pytest.fixture
-async def test_db() -> AsyncGenerator[sqlite3.Connection]:
-    """Create a test SQLite database.
+async def test_engine() -> AsyncGenerator[AsyncEngine]:
+    """Create a test SQLAlchemy engine.
 
-    This fixture creates an in-memory SQLite database and sets up the test schema.
+    This fixture creates an in-memory SQLite database for testing.
     """
+    # Create engine with in-memory SQLite
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
 
-    conn = get_in_memory_connection()
-    await create_sqlite_table(conn)
+    # Create schema
+    await create_sku_table(engine)
+
     try:
-        yield conn
+        yield engine
     finally:
-        # SQLite doesn't need closing for in-memory databases
-        pass
+        await engine.dispose()
 
 
 @pytest.fixture
-def sku_repo(test_db: sqlite3.Connection) -> SqliteSkuRepository:
+async def test_db(test_engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
+    """Create a test database session.
+
+    This fixture creates a new session for each test.
+    """
+    async with get_async_session(test_engine) as session:
+        yield session
+
+
+@pytest.fixture
+def sku_repo(test_db: AsyncSession) -> SkuRepository:
     """Create a SKU repository with test database."""
-    return SqliteSkuRepository(connection=test_db)
+    return SkuRepository(session=test_db)
 
 
 @pytest.fixture
-def sku_logic(sku_repo: SqliteSkuRepository) -> SkuLogic:
+def sku_logic(sku_repo: SkuRepository) -> SkuLogic:
     """Create a SKU logic instance with test repository."""
     return SkuLogic(repo=sku_repo)
-
-
-@pytest.fixture
-def sku_servicer(sku_logic: SkuLogic) -> SkuServicer:
-    """Create a SKU servicer with test logic."""
-    return SkuServicer(logic=sku_logic)
 
 
 @pytest.fixture
@@ -94,3 +99,26 @@ async def test_sku(sku_logic: SkuLogic) -> SkuDomain:
 def test_config() -> BaseServiceConfig:
     """Get test configuration."""
     return BaseServiceConfig()
+
+
+@pytest.fixture
+def session_factory(
+    test_engine: AsyncEngine,
+) -> Callable[[], AsyncGenerator[AsyncSession]]:
+    """Create a session factory for servicer tests."""
+
+    @asynccontextmanager
+    async def _factory() -> AsyncGenerator[AsyncSession]:
+        async with get_async_session(test_engine) as session:
+            yield session
+
+    return _factory
+
+
+@pytest.fixture
+def sku_servicer(
+    sku_logic: SkuLogic,
+    session_factory: Callable[[], AsyncGenerator[AsyncSession]],
+) -> SkuServicer:
+    """Create a SKU servicer with test logic and session factory."""
+    return SkuServicer(logic=sku_logic, session_factory=session_factory)

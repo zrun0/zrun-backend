@@ -2,12 +2,8 @@
 
 from __future__ import annotations
 
-from zrun_base.logic.sku import (
-    CreateSkuInput,
-    SkuDomain,
-    SkuLogic,
-    UpdateSkuInput,
-)
+from zrun_base.logic.domain import CreateSkuInput, SkuDomain, UpdateSkuInput
+from zrun_base.logic.sku import SkuLogic
 
 __all__ = [
     "SkuDomain",

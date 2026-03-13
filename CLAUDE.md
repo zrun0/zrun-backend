@@ -1,242 +1,201 @@
-# CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# Zrun WMS Development Standards
 
-## Project Overview
-
-This is a production-grade Python monorepo for zrun microservices using gRPC for inter-service communication. The project uses uv workspaces and follows strict code quality standards (mypy strict mode, comprehensive linting).
-
-**Key Tech Stack:** Python 3.14+, uv (workspaces), gRPC/asyncio, structlog, pytest, ruff, mypy, protoc
+> This file provides strict architectural guidance for [Claude Code](https://claude.ai/code) when developing **Zrun SaaS WMS** — a production-grade Python monorepo backend. All code contributions must adhere to the service boundaries and quality standards defined in this document.
 
 ---
 
-## Common Development Commands
+## Table of Contents
 
-### Workspace Setup
+1. [Project Vision & Design Philosophy](#1-project-vision--design-philosophy)
+2. [Core Tech Stack](#2-core-tech-stack)
+3. [Common Development Commands](#3-common-development-commands)
+4. [Architectural Standards](#4-architectural-standards)
+5. [Code Quality Standards](#5-code-quality-standards)
+
+---
+
+## 1. Project Vision & Design Philosophy
+
+Zrun's core goal is **complexity convergence**. Every code contribution must strictly respect service boundaries to prevent business logic decay.
+
+| Service | Responsibility | Hard Constraints |
+|---|---|---|
+| **Base** (Static Data) | Core master data & rules (tenants, SKUs, locations) | No inventory handling, no order processing |
+| **Stock** (Inventory Core) | Single source of truth for quantities, strong consistency | No business logic, no calls to external systems |
+| **Ops** (Operations Hub) | Core business state machines (inbound, outbound, waves, picking) | Must drive Stock — never manipulate quantities directly |
+| **Integration** (External Adapter) | Absorbs uncertainty from third-party systems (ERP / 3PL / WCS) | Engineering reliability only — no business logic |
+| **Analytics** (Reporting Layer) | Pure read-only layer backed by analytical database | Must not affect live operations or write to the business DB |
+
+---
+
+## 2. Core Tech Stack
+
+| Category | Technology | Notes |
+|---|---|---|
+| **Language** | Python 3.14+ | Strict type checking, basedpyright standard mode |
+| **Package Manager** | `uv` (workspaces) | Dependency isolation across the monorepo |
+| **Task Runner** | `just` | Unified command entry point |
+| **Communication** | gRPC + asyncio | The only permitted inter-service communication method |
+| **Persistence** | SQLAlchemy 2.0 Async API + asyncpg / aiosqlite | asyncpg for production, aiosqlite for dev/test |
+| **Logging** | structlog | Structured contextual logging |
+| **Testing** | pytest + in-memory SQLite | Fast development validation, no external dependencies |
+
+---
+
+## 3. Common Development Commands
+
+### 3.1 Environment Setup & Proto Compilation
+
 ```bash
-just init              # Initialize workspace (sync all packages)
-just proto             # Compile proto files (run after .proto changes)
+just init       # Initialize workspace and sync all dependencies
+just proto      # Compile Protobuf files (required after any .proto change)
 ```
 
-### Service Operations
+### 3.2 Running Services
+
 ```bash
-just run <service>    # Run service with PostgreSQL (requires DATABASE_URL)
-just dev <service>    # Run service with SQLite (for development/testing)
-just list             # List all services and their status
+just dev <service>    # Start in dev mode with SQLite (e.g. just dev zrun-base)
+just run <service>    # Start in production mode with PostgreSQL (requires DATABASE_URL)
+just list             # List all macro-services and their current status
 ```
 
-### Quality Checks (run from root)
+### 3.3 Quality Checks (run from repo root)
+
 ```bash
-just format           # Auto-format code with ruff
-just format-check     # Check code format without changes
-just lint             # Lint code with ruff
-just lint-fix         # Auto-fix linting issues
-just typecheck        # Type check with mypy
-just check            # Run all checks (format + lint + type)
+just check            # Run full check suite (Format + Lint + Type + Proto)
+just format-check     # Check code formatting only
+just typecheck        # Run basedpyright type checker
 ```
 
-### Testing (per-service)
+### 3.4 Testing
+
 ```bash
-just test <service>           # Full test suite (checks + tests)
-just test-unit <service>     # Unit tests only
-just test-integration <service>  # Integration tests only
-just test-cov <service>      # With coverage report
-
-# Direct pytest (from service directory):
-uv run pytest tests/unit/ -v                    # Unit tests
-uv run pytest tests/integration/ -v               # Integration tests
-uv run pytest tests/unit/test_sku_logic.py::TestSkuLogic::test_create_sku_success -v  # Single test
-```
-
-### Database Backend Control
-```bash
-# Services default to SQLite for development
-DATABASE_BACKEND=sqlite just dev zrun-base
-
-# For production, set DATABASE_URL for PostgreSQL
-DATABASE_URL="postgresql://..." just run zrun-base
+just test <service>               # Run full test suite for a service
+just test-unit <service>          # Run unit tests only
+just test-integration <service>   # Run integration tests (includes Mock gRPC Context)
 ```
 
 ---
 
-## Architecture
+## 4. Architectural Standards
 
-### Monorepo Structure
-```
-zrun-backend/
-├── shared/
-│   ├── zrun-core/       # Infrastructure: auth, logging, errors, lock, server
-│   └── zrun-schema/     # Proto definitions & generated code
-├── services/
-│   ├── zrun-base/      # Core business service (SKU management - MVP)
-│   ├── zrun-stock/     # Stock management
-│   ├── zrun-ops/       # Operations
-│   ├── zrun-integration/# Third-party integrations
-│   └── zrun-analytics/ # Analytics
-└── scripts/            # Root-level utility scripts
-```
+### 4.1 Inter-Service Interaction Rules ⚠️ CRITICAL
 
-### Layered Architecture (Per Service)
+> PRs that violate these rules will be rejected without review.
 
-Each service follows a strict layered architecture:
+- **No direct imports**: Cross-service `import` is strictly forbidden. For example, `zrun-ops` must never import any module from `zrun-stock`.
+- **gRPC is the only interface**: All cross-service calls must go through gRPC interfaces defined in `zrun-schema`.
+- **Dependency direction**:
+  - `Ops` → `Stock` (synchronous / strongly consistent)
+  - `Ops` ↔ `Integration` (command dispatch / event-driven, async permitted)
+
+---
+
+### 4.2 Internal Layer Structure (Layered Architecture)
+
+Every macro-service must strictly follow the three-layer architecture below. **Cross-layer direct references are forbidden.**
 
 ```
-<service>/
-├── src/<service>/
-│   ├── api/            # gRPC servicers (entry point, converts proto ↔ domain)
-│   ├── logic/          # Business logic + domain objects (validation, rules)
-│   ├── repository/     # Persistence layer (SQL databases)
-│   └── main.py         # Service entry point
-└── tests/
-    ├── unit/           # Isolated logic/repository tests
-    └── integration/    # Tests with mock gRPC context
+┌─────────────────────────────────────────────────┐
+│              Servicer Layer (servicers/)          │
+│   gRPC entry · Auth · Proto ↔ Domain codec       │
+├─────────────────────────────────────────────────┤
+│               Logic Layer (logic/)               │
+│   Core business logic · frozen dataclass objects │
+│   ⛔ Must NOT reference SQLAlchemy Models         │
+├─────────────────────────────────────────────────┤
+│           Repository Layer (repository/)          │
+│   SQLAlchemy 2.0 async mapping · Protocol iface  │
+│   Bidirectional Domain Object ↔ Model conversion │
+└─────────────────────────────────────────────────┘
 ```
 
-**Key Patterns:**
+**Servicer Layer** (`servicers/`)
+- Sole gRPC entry point for the service
+- Handles authentication (Auth) and authorization checks
+- Responsible for bidirectional encoding/decoding between Protobuf messages and domain objects
+- Contains no business logic
 
-1. **Servicer Layer (`api/`)**: Handles gRPC concerns only
-   - Extracts user context from gRPC context
-   - Converts protobuf ↔ domain objects
-   - Calls logic layer
-   - Uses `abort_with_error()` for error handling
+**Logic Layer** (`logic/`)
+- Owns all core business logic and state machines
+- Domain objects must be defined with `@dataclass(frozen=True)` to guarantee immutability
+- **Strictly forbidden** from referencing any SQLAlchemy Model or ORM-related types
 
-2. **Logic Layer (`logic/`)**: Pure business rules
-   - Contains frozen `@dataclass` domain objects
-   - Validation logic in `domain.validate()` methods
-   - Depends on `SkuRepository` protocol (not concrete implementations)
+**Repository Layer** (`repository/`)
+- Uses SQLAlchemy 2.0 async mapping (`AsyncSession`)
+- Must define `Protocol` interfaces for dependency inversion, enabling easy test substitution
+- Responsible for bidirectional conversion between Domain Objects and SQLAlchemy Models, fully isolating persistence details
 
-3. **Repository Layer (`repository/`)**: Data persistence
-   - Protocol-based design: `SkuRepository` Protocol defines interface
-   - Implementations: `PostgresSkuRepository`, `SqliteSkuRepository`, `MockSkuRepository`
-   - All database operations use proper timezone-aware `datetime`
+---
 
-### Inter-Service Communication
+### 4.3 Time & Precision Handling
 
-**CRITICAL:** Services NEVER import each other directly. All inter-service communication MUST go through gRPC:
-- Proto definitions in `shared/zrun-schema/protos/` (single source of truth)
-- Generated code in `shared/zrun-schema/src/zrun_schema/generated/`
-- Import pattern: `from zrun_schema.generated.base import sku_pb2 as base_sku_pb2`
+| Context | Standard |
+|---|---|
+| **Timezone** | Always use UTC. Naive datetimes are forbidden. SQLAlchemy fields must declare `timezone=True` |
+| **Quantity Precision** | Use `Numeric` / `Decimal` in the database; use `Decimal` in the Logic layer. **`float` is strictly forbidden** |
+| **Protobuf Transport** | Timestamps must be transmitted as `int64` (milliseconds) in Proto definitions |
 
-### Error Handling
+---
 
-Use the error hierarchy from `zrun_core.errors`:
-- `ValidationError`: Input validation failures (returns INVALID_ARGUMENT)
-- `NotFoundError`: Resource not found (returns NOT_FOUND)
-- `ConflictError`: Resource already exists (returns ALREADY_EXISTS)
-- `AuthenticationError`: Auth failures (returns UNAUTHENTICATED)
-- `AuthorizationError`: Permission denied (returns PERMISSION_DENIED)
+### 4.4 Error Handling (`zrun_core.errors`)
 
-**Pattern:** Assign exception messages to variables before raising (EM101/EM102 lint rules):
+> Raising generic exceptions (e.g. bare `Exception`, `ValueError`) is strictly forbidden. Use predefined exception classes so the Servicer layer can map them to the correct gRPC Status Codes uniformly.
+
+| Exception Class | gRPC Status | When to Use |
+|---|---|---|
+| `ValidationError` | `INVALID_ARGUMENT` | Input parameter format or range is invalid |
+| `NotFoundError` | `NOT_FOUND` | Requested resource does not exist |
+| `ConflictError` | `ALREADY_EXISTS` | Resource already exists or uniqueness constraint violated |
+| `BusinessError` | `FAILED_PRECONDITION` | Business rule violated (e.g. insufficient stock) |
+
+---
+
+## 5. Code Quality Standards
+
+### 5.1 Ruff Core Rules
+
+| Rule | Requirement |
+|---|---|
+| **EM101 / EM102** | Exception messages must be assigned to a variable before being passed to the exception constructor. **Correct**: `msg = "Insufficient stock"; raise BusinessError(msg)` |
+| **DTZ** | Timezone awareness is enforced. Calls to `datetime.now()` or `datetime.utcnow()` without a `tz` argument are forbidden |
+| **TCH** | Imports used only for type hints must be placed inside an `if TYPE_CHECKING:` block to avoid circular imports at runtime |
+
+### 5.2 SQLAlchemy Best Practices
+
+**Use the modern declarative syntax.** All Model fields must use `Mapped[T]` and `mapped_column()`. The legacy bare `Column()` style is forbidden.
+
 ```python
-msg = f"SKU with code '{code}' already exists"
-raise ConflictError(msg)
+# ✅ Correct
+class SkuModel(Base):
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(64), unique=True)
+
+# ❌ Forbidden
+class SkuModel(Base):
+    id = Column(Integer, primary_key=True)
 ```
 
-### Domain Objects
+**Manage `AsyncSession` lifecycle explicitly.** Transactions should be opened in the Servicer or Middleware layer. The Repository layer does not own transaction boundaries.
 
-- Always use `frozen=True` dataclasses for immutability
-- Include `validate()` method for self-validation
-- Use `datetime.now(UTC)` instead of `datetime.utcnow()`
-- Store timestamps as milliseconds (int64) in proto, convert to `datetime` in domain
-
-### Proto File Workflow
-
-1. Edit `.proto` files in `shared/zrun-schema/protos/`
-2. Run `just proto` to generate:
-   - `*_pb2.py` (messages)
-   - `*_pb2_grpc.py` (gRPC services)
-   - Post-processing script fixes import paths
-3. Import from services: `from zrun_schema.generated.base import sku_pb2 as base_sku_pb2`
-
-**IMPORTANT:** After proto compilation, `generated/base/__init__.py` may be deleted by clean operations. Recreate it if needed to fix import issues.
-
----
-
-## Code Quality Standards
-
-### Type Checking
-- **strict mode** enabled in `pyproject.toml`
-- Test files excluded from strict checking (but still type-checked)
-- Use `TYPE_CHECKING` blocks for imports only used in type hints
-- Proto generated code excluded from type checking
-
-### Linting (ruff)
-Key enabled rules:
-- **EM101/EM102:** Exception string literals must be assigned to variables first
-- **DTZ003/DTZ006:** Always use timezone-aware datetime (`datetime.now(UTC)`, `datetime.fromtimestamp(..., tz=UTC)`)
-- **N802:** gRPC methods use PascalCase (protobuf convention)
-- **ARG001:** Unused function arguments allowed in structlog processors (part of API)
-- **TCH:** Type-checking block suggestions (use judgment - some are false positives for runtime imports)
-
-### Import Organization
-- Known first-party: `zrun_core`, `zrun_schema`, `zrun_base`, `zrun_stock`, etc.
-- Use `from __future__ import annotations` at top of every file
-- Third-party imports (grpc, structlog, etc.) should be at module level, not nested in functions
-
----
-
-## Important Conventions
-
-### Naming
-- Service directories: `zrun-*` (kebab-case)
-- Module names: `zrun_*` (snake_case) - hyphens converted to underscores
-- gRPC methods: PascalCase (protobuf convention)
-- Test fixtures: pytest fixtures with descriptive names
-
-### Timezone Handling
-**Always use UTC for datetimes:**
 ```python
-from datetime import UTC, datetime
-
-now = datetime.now(UTC)  # Correct
-created_at = datetime.fromtimestamp(ms / 1000, tz=UTC)  # Correct
+# ✅ Open transactions in the Servicer layer
+async with async_session() as session:
+    async with session.begin():
+        result = await repo.get_sku(session, sku_id)
 ```
 
-### Async/Await
-- All repository methods are async
-- All servicer methods are async
-- Use `DATABASE_BACKEND=sqlite` for testing (in-memory SQLite)
-- Use pytest-asyncio with `asyncio_mode="auto"`
+**Define `Protocol` interfaces for dependency inversion** (enables clean test substitution):
 
-### Test Structure
-- `tests/unit/`: Tests for individual components (logic, repository) without external dependencies
-- `tests/integration/`: Tests with mock gRPC context, tests servo layer
-- Use `MockServicerContext` in integration tests (creates `MockRpcError` on `abort()`)
-- Fixtures in `tests/conftest.py`: `test_db`, `sku_repo`, `sku_logic`, `sku_servicer`
+```python
+from typing import Protocol
+
+class SkuRepository(Protocol):
+    async def get_by_code(self, session: AsyncSession, code: str) -> SkuDomain: ...
+    async def save(self, session: AsyncSession, sku: SkuDomain) -> None: ...
+```
 
 ---
 
-## Database Backends
-
-### SQLite (Development/Testing)
-- Default for development
-- In-memory: `get_in_memory_connection()` from `zrun_base.repository.sqlite`
-- Schema creation: `await create_sku_table(conn)`
-- **Limitation:** Multiple SQL statements must be executed separately (SQLite limitation)
-
-### PostgreSQL (Production)
-- Set `DATABASE_URL` environment variable
-- Connection pooling via `asyncpg.create_pool()`
-- Schema creation: `await create_postgres_sku_table(pool)`
-
----
-
-## Troubleshooting
-
-### Proto Import Errors
-If you see `ModuleNotFoundError: No module named 'common_pb2'`:
-1. Run `just proto` to regenerate
-2. Check `generated/base/__init__.py` exists (may need to recreate after clean)
-
-### Type Check Failures in Tests
-- Test files have relaxed mypy settings but still enforce basic type safety
-- Mock objects may need `# type: ignore` for intentionally untyped attributes
-
-### Format Issues After Proto Compilation
-- Run `just format` to auto-format
-- Generated proto files excluded from format checks
-
-### Lint False Positives
-- **TC001/TC002/TC003** (type-checking block): These are often false positives for imports used at runtime
-- **ARG001** (unused arguments): Acceptable for structlog processor functions (`_logger`, `_method_name`)
-- Use judgment before "fixing" these - many are intentional
+> 📌 **Final note**: When uncertain about a design decision, always prefer the option that makes **complexity converge** over the one with the most features. Maintainability in Zrun outweighs short-term delivery velocity.

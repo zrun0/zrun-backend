@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
     from redis.asyncio import Redis as AsyncRedis
 
 logger = structlog.get_logger()
@@ -205,7 +207,7 @@ async def redis_lock(
     key: str,
     ttl: int = 30,
     auto_renewal: bool = True,
-) -> Any:
+) -> AsyncIterator[RedisLock]:
     """Context manager for acquiring a Redis lock.
 
     Args:

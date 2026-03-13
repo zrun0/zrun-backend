@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 import grpc
 import pytest
 
-from zrun_base.logic.sku import CreateSkuInput, SkuLogic
-from zrun_base.servicers.sku_servicer import SkuServicer
+from zrun_base.logic.domain import CreateSkuInput
 from zrun_core import USER_ID_CTX_KEY
+
+if TYPE_CHECKING:
+    from zrun_base.logic.sku import SkuLogic
+    from zrun_base.servicers.sku_servicer import SkuServicer
 
 
 class MockRpcError(Exception):
@@ -42,7 +47,7 @@ class MockServicerContext:
 
 
 @pytest.fixture
-def mock_context() -> MockServicerContext:
+def mock_context() -> Any:
     """Create a mock servicer context."""
     return MockServicerContext()
 
@@ -53,7 +58,7 @@ class TestSkuServicer:
     async def test_create_sku_success(
         self,
         sku_servicer: SkuServicer,
-        mock_context: MockServicerContext,
+        mock_context: Any,
     ) -> None:
         """Test successful SKU creation via gRPC."""
         from zrun_schema.generated.base import sku_pb2 as base_sku_pb2
@@ -62,7 +67,7 @@ class TestSkuServicer:
         token = USER_ID_CTX_KEY.set("test-user")
         try:
             # Create request
-            request = base_sku_pb2.CreateSkuRequest(  # type: ignore[attr-defined]
+            request = base_sku_pb2.CreateSkuRequest(
                 code="TEST-SKU-001",
                 name="Test SKU",
             )
@@ -85,14 +90,14 @@ class TestSkuServicer:
     async def test_create_sku_empty_code_raises_error(
         self,
         sku_servicer: SkuServicer,
-        mock_context: MockServicerContext,
+        mock_context: Any,
     ) -> None:
         """Test that empty code raises an error."""
         from zrun_schema.generated.base import sku_pb2 as base_sku_pb2
 
         token = USER_ID_CTX_KEY.set("test-user")
         try:
-            request = base_sku_pb2.CreateSkuRequest(  # type: ignore[attr-defined]
+            request = base_sku_pb2.CreateSkuRequest(
                 code="",
                 name="Test SKU",
             )
@@ -110,7 +115,7 @@ class TestSkuServicer:
         self,
         sku_servicer: SkuServicer,
         sku_logic: SkuLogic,
-        mock_context: MockServicerContext,
+        mock_context: Any,
     ) -> None:
         """Test successful SKU retrieval via gRPC."""
         from zrun_schema.generated.base import sku_pb2 as base_sku_pb2
@@ -125,7 +130,7 @@ class TestSkuServicer:
             sku = await sku_logic.create_sku(input)
 
             # Get the SKU
-            request = base_sku_pb2.GetSkuRequest(sku_id=sku.id)  # type: ignore[attr-defined]
+            request = base_sku_pb2.GetSkuRequest(sku_id=sku.id)
             response = await sku_servicer.GetSku(request, mock_context)
 
             # Verify response - response is now GetSkuResponse
@@ -142,14 +147,14 @@ class TestSkuServicer:
     async def test_get_sku_not_found_aborts(
         self,
         sku_servicer: SkuServicer,
-        mock_context: MockServicerContext,
+        mock_context: Any,
     ) -> None:
         """Test that getting non-existent SKU aborts."""
         from zrun_schema.generated.base import sku_pb2 as base_sku_pb2
 
         token = USER_ID_CTX_KEY.set("test-user")
         try:
-            request = base_sku_pb2.GetSkuRequest(sku_id="non-existent-id")  # type: ignore[attr-defined]
+            request = base_sku_pb2.GetSkuRequest(sku_id="non-existent-id")
 
             with pytest.raises(MockRpcError):
                 await sku_servicer.GetSku(request, mock_context)
