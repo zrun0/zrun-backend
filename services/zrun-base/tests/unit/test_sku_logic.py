@@ -32,8 +32,8 @@ class MockSkuRepository:
     async def update(self, sku: SkuDomain) -> SkuDomain:
         """Update a SKU."""
         if sku.id not in self._skus:
-            msg = f"SKU {sku.id} not found"
-            raise ValueError(msg)
+            msg = f"SKU with ID '{sku.id}' not found"
+            raise NotFoundError(msg)
 
         # Update code index if code changed
         old_sku = self._skus[sku.id]

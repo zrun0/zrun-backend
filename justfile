@@ -220,14 +220,10 @@ test service:
 
     echo ""
     echo "==> Testing $SERVICE"
-    echo "   Ruff check..." \
-      && cd "$SERVICE_DIR" && uv run ruff check . || exit 1
-    echo "   Ruff format check..." \
-      && cd "$SERVICE_DIR" && uv run ruff format --check . || exit 1
-    echo "   Mypy type check..." \
-      && cd "$SERVICE_DIR" && uv run mypy . || exit 1
-    echo "   Pytest (SQLite)..." \
-      && cd "$SERVICE_DIR" && DATABASE_BACKEND=sqlite uv run pytest || exit 1
+    echo "   Ruff check..." && (cd "$SERVICE_DIR" && uv run ruff check .) || exit 1
+    echo "   Ruff format check..." && (cd "$SERVICE_DIR" && uv run ruff format --check .) || exit 1
+    echo "   Basedpyright type check..." && (cd "$SERVICE_DIR" && uv run basedpyright .) || exit 1
+    echo "   Pytest (SQLite)..." && (cd "$SERVICE_DIR" && DATABASE_BACKEND=sqlite uv run pytest) || exit 1
 
     echo ""
     echo "✓ All tests passed for $SERVICE"
