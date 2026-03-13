@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -65,7 +64,9 @@ class TestRedisLock:
         assert lock.acquired is False
 
     @pytest.mark.asyncio
-    async def test_acquire_lock_sets_correct_params(self, lock: RedisLock, mock_redis: MagicMock) -> None:
+    async def test_acquire_lock_sets_correct_params(
+        self, lock: RedisLock, mock_redis: MagicMock
+    ) -> None:
         """Test lock acquisition sets correct Redis parameters."""
         mock_redis.set.return_value = True
 

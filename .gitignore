@@ -145,9 +145,8 @@ cython_debug/
 # ruff
 .ruff_cache/
 
-# Generated proto code (keep directory via .gitkeep)
-shared/zrun-schema/src/zrun_schema/generated/*.py
-!shared/zrun-schema/src/zrun_schema/generated/.gitkeep
+# Generated proto code
+shared/zrun-schema/src/zrun_schema/generated/
 
 # IDE
 .idea/

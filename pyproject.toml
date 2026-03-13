@@ -1,3 +1,10 @@
+# =============================================================================
+# zrun-backend Monorepo Configuration
+# =============================================================================
+# Production-grade Python microservices using uv workspaces.
+# Python: >=3.14 | Tools: uv, ruff, basedpyright, pytest
+# =============================================================================
+
 [project]
 name = "zrun-backend"
 version = "0.1.0"
@@ -5,74 +12,48 @@ description = "Production-grade Python monorepo for zrun microservices"
 requires-python = ">=3.14"
 dependencies = []
 
-[project.optional-dependencies]
-dev = [
-    "mypy>=1.13.0",
-    "ruff>=0.8.0",
-    "pytest>=8.0.0",
-    "pytest-asyncio>=0.24.0",
-    "pytest-cov>=6.0.0",
-    "structlog>=25.0.0",
-    "grpcio>=1.60.0,<2.0.0",
-    "grpcio-tools>=1.60.0,<2.0.0",
-    "protobuf>=5.0.0",
-    "types-cachetools>=5.0.0",
-]
+# =============================================================================
+# UV WORKSPACE
+# =============================================================================
 
 [tool.uv.workspace]
 members = [
     "shared/zrun-core",
     "shared/zrun-schema",
     "services/zrun-base",
-    "services/zrun-stock",
-    "services/zrun-ops",
-    "services/zrun-integration",
     "services/zrun-analytics",
+    "services/zrun-integration",
+    "services/zrun-ops",
+    "services/zrun-stock",
 ]
 
 [tool.uv.sources]
 zrun-core = { workspace = true }
 zrun-schema = { workspace = true }
 
-[tool.mypy]
-python_version = "3.14"
-strict = true
+# =============================================================================
+# BASEDPYRIGHT (Type Checking)
+# =============================================================================
+
+[tool.basedpyright]
+typeCheckingMode = "standard"
+pythonVersion = "3.14"
 exclude = [
+    "**/tests/",
     "shared/zrun-schema/src/zrun_schema/generated/",
-    "build/",
-    "dist/",
-    ".venv/",
-    "services/.*/tests/",
-    "services/.*/tests/.*",
 ]
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_any_generics = true
+ignore = [
+    "**/generated/**",
+]
+reportMissingTypeStubs = "warning"
+reportUnknownMemberType = "warning"
+reportUnknownVariableType = "warning"
+reportAny = "warning"
+reportExplicitAny = "warning"
 
-[[tool.mypy.overrides]]
-module = "grpc.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "grpc.aio.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "google.protobuf.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "asyncpg.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "cachetools.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "pytest.*"
-ignore_missing_imports = true
+# =============================================================================
+# RUFF (Linting & Formatting)
+# =============================================================================
 
 [tool.ruff]
 line-length = 100
@@ -115,27 +96,22 @@ select = [
     "PTH",    # flake8-use-pathlib
     "ERA",    # eradicate
 ]
-ignore = []
 
 [tool.ruff.lint.per-file-ignores]
 "**/generated/*.py" = ["ALL"]
 "__init__.py" = ["F401"]
-"tests/**/*.py" = ["ARG001"]
-"**/*_servicer.py" = ["N802"]  # gRPC methods use PascalCase (protobuf convention)
-"**/api/*.py" = ["TC002"]  # Allow third-party imports in API layer
+"**/tests/**/*.py" = ["ARG001", "TCH002", "TCH003"]
+"**/*_servicer.py" = ["N802"]
+"**/api/*.py" = ["TC002"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["zrun_core", "zrun_schema", "zrun_base", "zrun_stock", "zrun_ops", "zrun_integration", "zrun_analytics"]
 
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
-skip-magic-trailing-comma = false
-line-ending = "auto"
+# =============================================================================
+# PYTEST (Testing)
+# =============================================================================
 
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
@@ -153,5 +129,5 @@ filterwarnings = [
 
 [dependency-groups]
 dev = [
-    "types-cachetools>=6.2.0.20251022",
+    "basedpyright>=1.38.2",
 ]

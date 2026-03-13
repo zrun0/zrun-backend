@@ -12,11 +12,5 @@ dependencies = [
     "protobuf>=5.0.0",
 ]
 
-
 [tool.hatch.build.targets.wheel]
 packages = ["src/zrun_schema"]
-
-[dependency-groups]
-dev = [
-    "mypy>=1.19.1",
-]

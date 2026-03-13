@@ -39,6 +39,7 @@ class TestAuthInterceptor:
         assert interceptor._audience == "test-audience"
         assert interceptor._issuer == "https://auth.example.com"
         from cachetools import TTLCache
+
         assert isinstance(interceptor._cache, TTLCache)
 
     @pytest.mark.asyncio
@@ -95,7 +96,9 @@ class TestAuthInterceptor:
         token = interceptor._extract_token_from_metadata(metadata)
         assert token == "custom-token-456"
 
-    def test_extract_token_authorization_takes_precedence(self, interceptor: AuthInterceptor) -> None:
+    def test_extract_token_authorization_takes_precedence(
+        self, interceptor: AuthInterceptor
+    ) -> None:
         """Test Authorization header takes precedence over custom token."""
         metadata = (
             ("authorization", "Bearer auth-token"),
@@ -117,9 +120,6 @@ class TestAuthInterceptor:
 
     def test_validate_token_valid_jwt(self, interceptor: AuthInterceptor) -> None:
         """Test validating a valid JWT token."""
-        # A valid JWT-like token (base64 encoded payload)
-        # Header: {"alg":"HS256","typ":"JWT"}
-        # Payload: {"sub":"user123","aud":"test-audience"}
         token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTIzIn0.signature"
 
         payload = interceptor._validate_token(token)

@@ -17,7 +17,6 @@ zrun-backend/
 │   ├── zrun-ops/           # Operations service
 │   ├── zrun-integration/   # Third-party integrations
 │   └── zrun-analytics/     # Analytics service
-└── scripts/                # Root-level scripts
 ```
 
 ## Tech Stack
@@ -28,7 +27,7 @@ zrun-backend/
 - **Logging**: structlog (JSON format, context-aware for ELK/Loki)
 - **Task Automation**: justfile
 - **Linting**: ruff
-- **Type Checking**: mypy (strict mode)
+- **Type Checking**: basedpyright (standard mode)
 - **Testing**: pytest with pytest-asyncio
 
 ## Getting Started

@@ -137,10 +137,7 @@ class AuthInterceptor(ServerInterceptor):  # type: ignore[misc]
             "Iterable[tuple[bytes | str, bytes | str]]",
             context.invocation_metadata(),
         )
-        metadata = {
-            _decode_metadata_key(k): _decode_metadata_value(v)
-            for k, v in metadata_iter
-        }
+        metadata = {_decode_metadata_key(k): _decode_metadata_value(v) for k, v in metadata_iter}
 
         # Try Authorization header first (case-insensitive)
         for key, value in metadata.items():
@@ -206,8 +203,7 @@ class AuthInterceptor(ServerInterceptor):  # type: ignore[misc]
 
         # Convert Metadata to dict, handling bytes keys/values
         metadata_dict = {
-            _decode_metadata_key(k): _decode_metadata_value(v)
-            for k, v in metadata_iter
+            _decode_metadata_key(k): _decode_metadata_value(v) for k, v in metadata_iter
         }
 
         # Try Authorization header first (case-insensitive)
