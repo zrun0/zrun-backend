@@ -32,26 +32,6 @@ zrun-core = { workspace = true }
 zrun-schema = { workspace = true }
 
 # =============================================================================
-# BASEDPYRIGHT (Type Checking)
-# =============================================================================
-
-[tool.basedpyright]
-typeCheckingMode = "standard"
-pythonVersion = "3.14"
-exclude = [
-    "**/tests/",
-    "shared/zrun-schema/src/zrun_schema/generated/",
-]
-ignore = [
-    "**/generated/**",
-]
-reportMissingTypeStubs = "warning"
-reportUnknownMemberType = "warning"
-reportUnknownVariableType = "warning"
-reportAny = "warning"
-reportExplicitAny = "warning"
-
-# =============================================================================
 # RUFF (Linting & Formatting)
 # =============================================================================
 

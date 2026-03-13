@@ -1,0 +1,61 @@
+{
+  "include": ["services", "shared"],
+  "exclude": ["**/node_modules", "**/__pycache__", "**/.venv", "**/tests/", "shared/zrun-schema/src/zrun_schema/generated/"],
+
+  "typeCheckingMode": "standard",
+  "pythonVersion": "3.14",
+  "pythonPlatform": "Linux",
+
+  "venvPath": ".",
+  "venv": ".venv",
+
+  "executionEnvironments": [
+    {
+      "root": "services/*/src/servicers",
+      "extraPaths": ["../../shared/zrun-core/src"],
+      "reportMissingTypeStubs": false,
+      "reportUnknownMemberType": "none",
+      "reportExplicitAny": "none",
+      "reportUnknownVariableType": "none",
+      "reportAny": "none"
+    },
+    {
+      "root": "services/*/src/logic",
+      "extraPaths": ["../../shared/zrun-core/src"],
+      "reportMissingTypeStubs": false,
+      "reportUnknownMemberType": "warning",
+      "reportExplicitAny": "error",
+      "reportUnknownVariableType": "warning",
+      "reportAny": "error"
+    },
+    {
+      "root": "services/*/src/repository",
+      "extraPaths": ["../../shared/zrun-core/src"],
+      "reportMissingTypeStubs": false,
+      "reportUnknownMemberType": "warning",
+      "reportExplicitAny": "error",
+      "reportUnknownVariableType": "warning",
+      "reportAny": "error"
+    },
+    {
+      "root": "services/*/src",
+      "extraPaths": ["../../shared/zrun-core/src"],
+      "reportMissingTypeStubs": false,
+      "reportUnknownMemberType": "warning",
+      "reportExplicitAny": "error",
+      "reportUnknownVariableType": "warning",
+      "reportAny": "error"
+    },
+    {
+      "root": "shared/zrun-core/src",
+      "reportMissingTypeStubs": false,
+      "reportUnknownMemberType": "none",
+      "reportExplicitAny": "none",
+      "reportUnknownVariableType": "none",
+      "reportAny": "none"
+    },
+    {
+      "root": "shared"
+    }
+  ]
+}
