@@ -10,7 +10,7 @@ requires-python = ">=3.14"
 dependencies = [
     "zrun-core",
     "zrun-schema",
-    "python-dateutil>=2.0.0",
+    "python-dateutil",
 ]
 
 [project.scripts]
