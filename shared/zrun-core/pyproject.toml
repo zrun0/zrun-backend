@@ -12,6 +12,7 @@ dependencies = [
     "asyncpg>=0.30.0",
     "cachetools>=5.0.0",
     "grpcio>=1.60.0,<2.0.0",
+    "grpcio-health-checking>=1.60.0",
     "httpx>=0.28.0",
     "pyjwt>=2.0.0",
     "python-dateutil>=2.0.0",

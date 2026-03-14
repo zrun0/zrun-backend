@@ -1,7 +1,7 @@
 """ZRun core infrastructure library.
 
 This package provides shared infrastructure components for all zrun services:
-- BaseGrpcServer: Base class for gRPC servers
+- BaseGRPCServer: Base class for gRPC servers
 - AuthInterceptor: JWT authentication interceptor with JWKS caching
 - RedisLock: Distributed lock implementation with watchdog
 - DomainError hierarchy: Exception types for domain errors
@@ -27,17 +27,23 @@ from zrun_core.errors import (
     ValidationError,
     map_error_to_grpc_status,
 )
+from zrun_core.health import (
+    create_health_servicer,
+    mark_healthy,
+    mark_unhealthy,
+    register_health_service,
+)
 from zrun_core.lock import RedisLock
 from zrun_core.logging import configure_structlog, get_logger
 from zrun_core.server import (
-    BaseGrpcServer,
+    BaseGRPCServer,
     configure_service_logging,
     create_auth_interceptor,
     run_service,
 )
 
 __all__ = [
-    "BaseGrpcServer",
+    "BaseGRPCServer",
     "AuthInterceptor",
     "USER_ID_CTX_KEY",
     "RedisLock",
@@ -52,6 +58,11 @@ __all__ = [
     "configure_service_logging",
     "create_auth_interceptor",
     "run_service",
+    # Health check utilities
+    "create_health_servicer",
+    "register_health_service",
+    "mark_healthy",
+    "mark_unhealthy",
     # SQLAlchemy 2.0 utilities
     "Base",
     "TimestampMixin",
