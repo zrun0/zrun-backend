@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from zrun_base.logic.sku import CreateSkuInput, SkuDomain, SkuLogic, UpdateSkuInput
-from zrun_core.errors import ConflictError, NotFoundError, ValidationError
+from zrun_core.domain import ConflictError, NotFoundError, ValidationError
 
 
 class MockSkuRepository:

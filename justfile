@@ -192,10 +192,15 @@ lint:
     @echo "==> Linting code..."
     uv run ruff check .
 
-# Fix linting issues automatically
+# Fix linting issues automatically (safe fixes only)
 lint-fix:
     @echo "==> Fixing linting issues..."
     uv run ruff check --fix .
+
+# Fix linting issues including unsafe fixes (may change code behavior)
+lint-fix-unsafe:
+    @echo "==> Fixing linting issues (including unsafe)..."
+    uv run ruff check --fix --unsafe-fixes .
 
 # Type check with basedpyright (core packages only)
 typecheck:

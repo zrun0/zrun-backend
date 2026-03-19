@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine as Engine
 
     from zrun_core.auth import AuthInterceptor
-    from zrun_core.config import ServiceConfig
+    from zrun_core.infra import ServiceConfig
 
 
 logger = structlog.get_logger()
@@ -38,7 +38,7 @@ def configure_service_logging(
     Returns:
         A configured bound logger instance.
     """
-    from zrun_core.logging import configure_structlog, get_logger
+    from zrun_core.infra import configure_structlog, get_logger
 
     configure_structlog(
         service_name=service_name,
@@ -132,7 +132,7 @@ class BaseGRPCServer:
 
         # Register health check service if enabled
         if self._enable_health_check:
-            from zrun_core.health import (
+            from .health import (
                 create_health_servicer,
                 mark_healthy,
                 register_health_service,
@@ -185,7 +185,7 @@ class BaseGRPCServer:
 
         # Mark as unhealthy before stopping
         if self._health_servicer is not None:
-            from zrun_core.health import mark_unhealthy
+            from .health import mark_unhealthy
 
             mark_unhealthy(self._health_servicer)  # type: ignore[no-untyped-call]
 

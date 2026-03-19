@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from zrun_core.config import ServiceConfig
+from zrun_core.infra import ServiceConfig
 
 
 class DatabaseBackend(Enum):

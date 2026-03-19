@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from zrun_base.logic.domain import CreateSkuInput, SkuDomain, UpdateSkuInput
 from zrun_core import USER_ID_CTX_KEY, get_async_transaction, get_logger
-from zrun_core.errors import abort_with_error
+from zrun_core.domain import abort_with_error
 
 if TYPE_CHECKING:
     from collections.abc import Callable

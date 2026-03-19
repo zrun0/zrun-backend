@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from zrun_core.config import ServiceConfig, get_config
+from zrun_core.infra import ServiceConfig, get_config
 
 
 class TestServiceConfig:

@@ -1,23 +1,21 @@
-"""Distributed lock implementation using Redis."""
+"""Single-node distributed lock implementation using Redis."""
 
 from __future__ import annotations
 
 import asyncio
-from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
 import structlog
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
 
     from redis.asyncio import Redis as AsyncRedis
 
 logger = structlog.get_logger()
 
 
-class RedisLock:
-    """Distributed lock using Redis.
+class SingleNodeLock:
+    """Single-node distributed lock using Redis.
 
     This lock uses the SET NX PX command for acquisition and a Lua script
     for safe release. It also includes a background watchdog task that
@@ -25,7 +23,7 @@ class RedisLock:
 
     Usage:
         ```python
-        async with RedisLock(redis, "my_lock", ttl=30) as lock:
+        async with SingleNodeLock(redis, "my_lock", ttl=30) as lock:
             if lock.acquired:
                 # Critical section
                 pass
@@ -182,7 +180,7 @@ class RedisLock:
         """Check if the lock is currently held."""
         return self._acquired
 
-    async def __aenter__(self) -> RedisLock:
+    async def __aenter__(self) -> SingleNodeLock:
         """Acquire the lock when entering the context.
 
         Returns:
@@ -201,28 +199,5 @@ class RedisLock:
         await self.release()
 
 
-@asynccontextmanager
-async def redis_lock(
-    redis: AsyncRedis,
-    key: str,
-    ttl: int = 30,
-    auto_renewal: bool = True,
-) -> AsyncIterator[RedisLock]:
-    """Context manager for acquiring a Redis lock.
-
-    Args:
-        redis: Redis client instance.
-        key: Lock key in Redis.
-        ttl: Lock TTL in seconds.
-        auto_renewal: Whether to automatically renew the lock.
-
-    Yields:
-        The RedisLock instance.
-    """
-    lock = RedisLock(redis, key, ttl, auto_renewal)
-    await lock.acquire()
-
-    try:
-        yield lock
-    finally:
-        await lock.release()
+# Alias for backward compatibility
+RedisLock = SingleNodeLock

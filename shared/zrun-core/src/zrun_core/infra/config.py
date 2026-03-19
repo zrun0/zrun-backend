@@ -46,6 +46,16 @@ class ServiceConfig(BaseSettings):
     redis_pool_size: int = 10
     redis_db: int = 0
 
+    # Distributed Lock
+    lock_mode: Literal["single", "redlock"] = "single"
+    lock_redis_urls: list[str] = []  # Multi-node URLs for redlock mode
+    lock_ttl: int = 30  # Lock TTL in seconds
+    lock_retry_times: int = 3  # Retry times for lock acquisition
+    lock_retry_delay: float = 0.2  # Retry delay in seconds
+    lock_drift_factor: float = 0.01  # Clock drift factor for redlock
+    lock_auto_renewal: bool = True  # Auto-renewal for single-node locks
+    lock_renewal_interval: float = 0.8  # Fraction of TTL before renewal
+
     # Authentication
     jwks_url: str = "http://localhost:8080/.well-known/jwks.json"
     jwt_audience: str = "zrun"

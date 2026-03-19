@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from zrun_core.errors import ValidationError
+from zrun_core.domain import ValidationError
 
 if TYPE_CHECKING:
     from datetime import datetime

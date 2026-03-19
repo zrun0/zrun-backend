@@ -578,7 +578,7 @@ wheels = [
 
 [[package]]
 name = "zrun-analytics"
-version = "0.1.0"
+version = "0.1.0.dev0"
 source = { editable = "services/zrun-analytics" }
 dependencies = [
     { name = "zrun-core" },
@@ -593,7 +593,7 @@ requires-dist = [
 
 [[package]]
 name = "zrun-backend"
-version = "0.1.0"
+version = "0.1.0.dev0"
 source = { virtual = "." }
 
 [package.dev-dependencies]
@@ -618,7 +618,7 @@ dev = [
 
 [[package]]
 name = "zrun-base"
-version = "0.1.0"
+version = "0.1.0.dev0"
 source = { editable = "services/zrun-base" }
 dependencies = [
     { name = "python-dateutil" },
@@ -638,7 +638,7 @@ dev = []
 
 [[package]]
 name = "zrun-core"
-version = "0.1.0"
+version = "0.1.0.dev0"
 source = { editable = "shared/zrun-core" }
 dependencies = [
     { name = "aiosqlite" },
@@ -684,7 +684,7 @@ provides-extras = ["test"]
 
 [[package]]
 name = "zrun-integration"
-version = "0.1.0"
+version = "0.1.0.dev0"
 source = { editable = "services/zrun-integration" }
 dependencies = [
     { name = "zrun-core" },
@@ -699,7 +699,7 @@ requires-dist = [
 
 [[package]]
 name = "zrun-ops"
-version = "0.1.0"
+version = "0.1.0.dev0"
 source = { editable = "services/zrun-ops" }
 dependencies = [
     { name = "zrun-core" },
@@ -714,7 +714,7 @@ requires-dist = [
 
 [[package]]
 name = "zrun-schema"
-version = "0.1.0"
+version = "0.1.0.dev0"
 source = { editable = "shared/zrun-schema" }
 dependencies = [
     { name = "grpcio" },
@@ -729,7 +729,7 @@ requires-dist = [
 
 [[package]]
 name = "zrun-stock"
-version = "0.1.0"
+version = "0.1.0.dev0"
 source = { editable = "services/zrun-stock" }
 dependencies = [
     { name = "zrun-core" },
