@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "zrun-ops"
-version = "0.1.0"
+version = "0.1.0-dev"
 description = "Operations service for zrun"
 requires-python = ">=3.14"
 dependencies = [

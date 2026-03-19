@@ -385,3 +385,24 @@ docker-clean:
     @echo "==> Cleaning docker resources..."
     docker system prune -f
     docker image prune -f
+
+# =============================================================================
+# VERSION MANAGEMENT
+# =============================================================================
+
+# Sync version across all packages (reads from root pyproject.toml)
+version-sync:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "==> Syncing versions across all packages..."
+    ROOT_VER=$(grep '^version = ' pyproject.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+    echo "Root version: $ROOT_VER"
+    for f in shared/*/pyproject.toml services/*/pyproject.toml; do
+        sed -i "s/^version = .*/version = \"$ROOT_VER\"/" "$f"
+        echo "Updated: $f"
+    done
+
+# Show versions across all packages
+version-check:
+    @echo "=== All package versions ==="
+    @rg "^version" pyproject.toml shared/*/pyproject.toml services/*/pyproject.toml 2>/dev/null | sort
