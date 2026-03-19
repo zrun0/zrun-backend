@@ -1,0 +1,32 @@
+# =============================================================================
+# zrun-backend Base Image (Runtime)
+# =============================================================================
+# Minimal runtime image with only system-level dependencies.
+# NO uv, NO code - just Python + grpc_health_probe.
+#
+# Build: docker build -f docker/Dockerfile.base -t zrun-base-image:latest .
+# =============================================================================
+
+FROM python:3.14-slim
+
+# Install grpc_health_probe for K8s health checks
+RUN GRPC_HEALTH_PROBE_VERSION=v0.4.28 && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends wget ca-certificates && \
+    ARCH=$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/') && \
+    wget -qO/bin/grpc_health_probe "https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc_health_probe-linux-${ARCH}" && \
+    chmod +x /bin/grpc_health_probe && \
+    apt-get purge -y wget && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Create non-root user (consistent UID across all services)
+RUN useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app
+
+# Default gRPC port
+EXPOSE 50051
+
+USER appuser

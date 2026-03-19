@@ -350,3 +350,38 @@ ls: list
 # Alias for test
 t service:
     just test {{service}}
+
+# =============================================================================
+# CONTAINER (Docker)
+# =============================================================================
+
+# Build base image (only needed when Python/system deps change)
+docker-build-base:
+    @echo "==> Building base image..."
+    docker build -f docker/Dockerfile.base -t zrun-base-image:latest .
+
+# Build a service container image
+docker-build service:
+    @echo "==> Building {{service}}..."
+    docker build -f docker/Dockerfile --build-arg SERVICE={{service}} -t {{service}}:latest .
+
+# Build all service containers (includes base image)
+docker-build-all: docker-build-base
+    @echo "==> Building all services..."
+    @for svc in zrun-base zrun-stock zrun-ops zrun-integration zrun-analytics; do \
+        echo "Building $$svc..."; \
+        docker build -f docker/Dockerfile --build-arg SERVICE=$$svc -t $$svc:latest .; \
+    done
+
+# Push image to registry (requires REGISTRY env var)
+docker-push service:
+    @echo "==> Pushing {{service}} to ${REGISTRY}..."
+    @if [ -z "$$REGISTRY" ]; then echo "Error: REGISTRY env var not set"; exit 1; fi
+    docker tag {{service}}:latest ${REGISTRY}/{{service}}:latest
+    docker push ${REGISTRY}/{{service}}:latest
+
+# Clean up docker resources
+docker-clean:
+    @echo "==> Cleaning docker resources..."
+    docker system prune -f
+    docker image prune -f
