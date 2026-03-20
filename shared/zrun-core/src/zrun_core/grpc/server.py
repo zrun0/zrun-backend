@@ -8,7 +8,8 @@ from contextlib import asynccontextmanager, suppress
 from typing import TYPE_CHECKING
 
 import grpc.aio
-import structlog
+
+from zrun_core.infra import LoggerMixin
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable, Sequence
@@ -16,64 +17,10 @@ if TYPE_CHECKING:
     from grpc.aio import Server
     from sqlalchemy.ext.asyncio import AsyncEngine as Engine
 
-    from zrun_core.auth import AuthInterceptor
     from zrun_core.infra import ServiceConfig
 
 
-logger = structlog.get_logger()
-
-
-def configure_service_logging(
-    service_name: str,
-    log_level: str,
-    log_format: str,
-) -> structlog.stdlib.BoundLogger:
-    """Configure structlog for a service and return a logger.
-
-    Args:
-        service_name: Name of the service.
-        log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL).
-        log_format: Log format (json or console).
-
-    Returns:
-        A configured bound logger instance.
-    """
-    from zrun_core.infra import configure_structlog, get_logger
-
-    configure_structlog(
-        service_name=service_name,
-        log_level=log_level,
-        log_format=log_format,
-    )
-
-    return get_logger()
-
-
-def create_auth_interceptor(
-    jwks_url: str,
-    audience: str,
-    issuer: str | None = None,
-) -> AuthInterceptor:  # type: ignore[name-defined]
-    """Create an authentication interceptor.
-
-    Args:
-        jwks_url: URL to fetch JWKS from.
-        audience: Expected JWT audience claim.
-        issuer: Expected JWT issuer claim (optional).
-
-    Returns:
-        Configured AuthInterceptor instance.
-    """
-    from zrun_core.auth import AuthInterceptor
-
-    return AuthInterceptor(
-        jwks_url=jwks_url,
-        audience=audience,
-        issuer=issuer,
-    )
-
-
-class BaseGRPCServer:
+class BaseGRPCServer(LoggerMixin):
     """Base gRPC server with lifecycle management.
 
     This class provides a production-ready gRPC server with:
@@ -149,7 +96,7 @@ class BaseGRPCServer:
         if self._health_servicer is not None:
             mark_healthy(self._health_servicer)  # type: ignore[no-untyped-call]
 
-        logger.info(
+        self.logger.info(
             "server_started",
             port=self._port,
             max_workers=self._max_workers,
@@ -171,7 +118,7 @@ class BaseGRPCServer:
 
     def _handle_signal(self) -> None:
         """Handle termination signals."""
-        logger.info("shutdown_signal_received")
+        self.logger.info("shutdown_signal_received")
         self._shutdown_event.set()
 
     async def stop(self, grace_period: float = 5.0) -> None:
@@ -189,14 +136,14 @@ class BaseGRPCServer:
 
             mark_unhealthy(self._health_servicer)  # type: ignore[no-untyped-call]
 
-        logger.info("server_stopping", grace_period=grace_period)
+        self.logger.info("server_stopping", grace_period=grace_period)
 
         try:
             await asyncio.wait_for(self._server.stop(grace_period), timeout=grace_period + 1)
-            logger.info("server_stopped")
+            self.logger.info("server_stopped")
         except TimeoutError, asyncio.CancelledError:
             # Shutdown was interrupted, which is acceptable during forced termination
-            logger.info("server_shutdown_interrupted")
+            self.logger.info("server_shutdown_interrupted")
 
     async def wait_for_termination(self) -> None:
         """Wait for the server to terminate."""
@@ -230,12 +177,13 @@ async def run_service(
     servicers: Sequence[tuple[Callable[[object, Server], None], object]],  # type: ignore[name-defined]
     config: ServiceConfig,
     engine: Engine | None = None,  # type: ignore[name-defined]
+    *,
+    service_name: str = "zrun-service",
 ) -> int:
     """Run a gRPC service with full lifecycle management.
 
     This function handles:
     - Logging configuration
-    - Interceptor setup (auth if enabled)
     - Server creation and servicer registration
     - Graceful shutdown on signals
     - Engine disposal if provided
@@ -245,16 +193,20 @@ async def run_service(
             register_fn is the gRPC add_*_servicer_to_server function.
         config: Service configuration.
         engine: Optional SQLAlchemy async engine to dispose on shutdown.
+        service_name: Name of the service for logging context.
 
     Returns:
         Exit code (0 for success, non-zero for failure).
     """
     # Configure logging
-    service_logger = configure_service_logging(
-        service_name="zrun-service",
+    from zrun_core.infra import configure_structlog, get_logger
+
+    configure_structlog(
+        service_name=service_name,
         log_level=config.log_level,
         log_format=config.log_format,
     )
+    service_logger = get_logger()
 
     service_logger.info(
         "service_starting",
@@ -262,20 +214,10 @@ async def run_service(
         port=config.port,
     )
 
-    # Build interceptors
-    interceptors: list[grpc.aio.ServerInterceptor] = []
-    if config.enable_auth:
-        auth_interceptor = create_auth_interceptor(
-            jwks_url=config.jwks_url,
-            audience=config.jwt_audience,
-            issuer=config.jwt_issuer,
-        )
-        interceptors.append(auth_interceptor)  # type: ignore[arg-type]
-
     # Create and start server
     server = BaseGRPCServer(
         port=config.port,
-        interceptors=interceptors,
+        interceptors=[],
         max_workers=config.max_workers,
         service_config=config,
     )

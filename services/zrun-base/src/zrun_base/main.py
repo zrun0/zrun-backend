@@ -87,6 +87,7 @@ async def main() -> int:
             servicers=servicers,
             config=config,
             engine=engine,
+            service_name="zrun-base",
         )
 
 

@@ -34,8 +34,6 @@ from zrun_core.errors import (
 # =============================================================================
 from zrun_core.grpc import (
     BaseGRPCServer,
-    configure_service_logging,
-    create_auth_interceptor,
     create_health_servicer,
     create_test_server,
     mark_healthy,
@@ -111,8 +109,6 @@ __all__ = [
     # gRPC Server
     # =========================================================================
     "BaseGRPCServer",
-    "configure_service_logging",
-    "create_auth_interceptor",
     "run_service",
     "create_test_server",
     # Health

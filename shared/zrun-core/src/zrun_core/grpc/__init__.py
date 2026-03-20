@@ -10,8 +10,6 @@ from zrun_core.grpc.health import (
 )
 from zrun_core.grpc.server import (
     BaseGRPCServer,
-    configure_service_logging,
-    create_auth_interceptor,
     create_test_server,
     run_service,
 )
@@ -19,8 +17,6 @@ from zrun_core.grpc.server import (
 __all__ = [
     # Server
     "BaseGRPCServer",
-    "configure_service_logging",
-    "create_auth_interceptor",
     "run_service",
     "create_test_server",
     # Health
