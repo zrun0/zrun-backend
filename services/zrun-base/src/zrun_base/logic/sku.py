@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from zrun_base.logic.domain import CreateSkuInput, SkuDomain, UpdateSkuInput
-from zrun_core.domain import ConflictError, NotFoundError, ValidationError
+from zrun_core.errors import ConflictError, NotFoundError, ValidationError
 
 if TYPE_CHECKING:
     from zrun_base.repository.protocols import SkuRepositoryProtocol

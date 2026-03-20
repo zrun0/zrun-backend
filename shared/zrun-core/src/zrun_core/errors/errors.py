@@ -14,6 +14,9 @@ class DomainError(Exception):
     expected and recoverable (e.g., validation errors, not found errors).
     """
 
+    message: str
+    code: str
+
     def __init__(
         self,
         message: str,

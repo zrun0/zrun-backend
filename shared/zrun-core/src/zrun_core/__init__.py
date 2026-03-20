@@ -3,10 +3,9 @@
 This package provides shared infrastructure components for all zrun services.
 
 Modules:
-- infra: Configuration and logging
+- infra: Configuration, logging, and database utilities
 - auth: JWT authentication interceptor with JWKS caching
 - domain: Domain error hierarchy with gRPC status mapping
-- database: SQLAlchemy 2.0 async engine, session, and base models
 - grpc: gRPC server with lifecycle management and health checks
 - lock: Distributed lock with single-node and Redlock support
 """
@@ -19,20 +18,9 @@ from __future__ import annotations
 from zrun_core.auth import USER_ID_CTX_KEY, AuthInterceptor
 
 # =============================================================================
-# Database
-# =============================================================================
-from zrun_core.database import (
-    Base,
-    TimestampMixin,
-    create_async_engine,
-    get_async_session,
-    get_async_transaction,
-)
-
-# =============================================================================
 # Domain
 # =============================================================================
-from zrun_core.domain import (
+from zrun_core.errors import (
     ConflictError,
     DomainError,
     NotFoundError,
@@ -60,9 +48,14 @@ from zrun_core.grpc import (
 # Infrastructure
 # =============================================================================
 from zrun_core.infra import (
+    Base,
     LoggerMixin,
     ServiceConfig,
+    TimestampMixin,
     configure_structlog,
+    create_async_engine,
+    get_async_session,
+    get_async_transaction,
     get_config,
     get_logger,
 )

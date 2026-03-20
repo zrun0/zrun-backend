@@ -1,8 +1,8 @@
-"""Domain layer - shared business concepts and error handling."""
+"""Error handling - domain errors and gRPC mapping."""
 
 from __future__ import annotations
 
-from zrun_core.domain.errors import (
+from zrun_core.errors.errors import (
     AuthenticationError,
     AuthorizationError,
     ConflictError,

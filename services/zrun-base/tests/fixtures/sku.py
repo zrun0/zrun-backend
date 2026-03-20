@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from zrun_base.logic.sku import CreateSkuInput, SkuDomain, UpdateSkuInput
+from zrun_base.logic.domain import CreateSkuInput, SkuDomain, UpdateSkuInput
 
 
 def create_test_sku(

@@ -9,20 +9,16 @@ class LockError(Exception):
     """Base exception for lock-related errors."""
 
 
-
 class LockAcquisitionError(LockError):
     """Raised when lock acquisition fails."""
-
 
 
 class LockReleaseError(LockError):
     """Raised when lock release fails."""
 
 
-
 class LockRenewalError(LockError):
     """Raised when lock renewal fails."""
-
 
 
 class DistributedLock(Protocol):

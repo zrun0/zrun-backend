@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 if TYPE_CHECKING:
-
     from redis.asyncio import Redis as AsyncRedis
 
 logger = structlog.get_logger()

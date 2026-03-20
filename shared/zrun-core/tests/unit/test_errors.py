@@ -6,7 +6,7 @@ import contextlib
 
 import grpc
 
-from zrun_core.domain import (
+from zrun_core.errors import (
     AuthenticationError,
     ConflictError,
     DomainError,
@@ -68,7 +68,7 @@ class TestErrorSubclasses:
 
     def test_authorization_error(self) -> None:
         """Test AuthorizationError."""
-        from zrun_core.domain import AuthorizationError
+        from zrun_core.errors import AuthorizationError
 
         error = AuthorizationError(message="Access denied")
         assert isinstance(error, DomainError)
@@ -109,7 +109,7 @@ class TestMapErrorToGrpcStatus:
 
     def test_authorization_error_maps_to_permission_denied(self) -> None:
         """Test AuthorizationError maps to PERMISSION_DENIED."""
-        from zrun_core.domain import AuthorizationError
+        from zrun_core.errors import AuthorizationError
 
         status = map_error_to_grpc_status(AuthorizationError(message="Denied"))
         assert status == grpc.StatusCode.PERMISSION_DENIED

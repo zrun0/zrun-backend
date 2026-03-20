@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 if TYPE_CHECKING:
-
     from redis.asyncio import Redis as AsyncRedis
 
 logger = structlog.get_logger()
@@ -110,9 +109,7 @@ class Redlock:
                         acquired_count += 1
                 except Exception as e:
                     node_id = (
-                        await client.client_id()
-                        if hasattr(client, "client_id")
-                        else "unknown"
+                        await client.client_id() if hasattr(client, "client_id") else "unknown"
                     )
                     logger.warning(
                         "redlock_node_error",
@@ -171,11 +168,7 @@ class Redlock:
                 if result:
                     released_count += 1
             except Exception as e:
-                node_id = (
-                    await client.client_id()
-                    if hasattr(client, "client_id")
-                    else "unknown"
-                )
+                node_id = await client.client_id() if hasattr(client, "client_id") else "unknown"
                 logger.warning(
                     "redlock_release_error",
                     node=node_id,

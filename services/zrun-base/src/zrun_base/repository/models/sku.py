@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from zrun_core.database import Base, TimestampMixin
+from zrun_core.infra import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from zrun_base.logic.domain import SkuDomain
