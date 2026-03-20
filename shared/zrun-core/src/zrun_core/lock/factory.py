@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
-from zrun_core.lock.redlock import Redlock
+from zrun_core.lock.distributed import Redlock
 from zrun_core.lock.single import SingleNodeLock
 
 if TYPE_CHECKING:
     from redis.asyncio import Redis as AsyncRedis
 
-    from zrun_core.lock.protocol import DistributedLock
+    from zrun_core.lock.interface import DistributedLock
 
 
 def create_lock(

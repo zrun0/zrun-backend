@@ -11,15 +11,15 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
+from zrun_core.lock.distributed import Redlock
 from zrun_core.lock.factory import create_lock
-from zrun_core.lock.protocol import (
+from zrun_core.lock.interface import (
     DistributedLock,
     LockAcquisitionError,
     LockError,
     LockReleaseError,
     LockRenewalError,
 )
-from zrun_core.lock.redlock import Redlock
 from zrun_core.lock.single import RedisLock, SingleNodeLock
 
 if TYPE_CHECKING:

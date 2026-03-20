@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from pathlib import Path
 from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -88,23 +87,6 @@ class ServiceConfig(BaseSettings):
     def database_pool_min_size(self) -> int:
         """Minimum database pool size."""
         return max(1, self.database_pool_size // 2)
-
-
-def _find_env_file() -> Path | None:
-    """Find the .env file by searching up the directory tree.
-
-    Returns:
-        Path to the .env file if found, None otherwise.
-    """
-    current_path = Path.cwd()
-
-    while current_path != current_path.parent:
-        env_file = current_path / ".env"
-        if env_file.exists():
-            return env_file
-        current_path = current_path.parent
-
-    return None
 
 
 @lru_cache
