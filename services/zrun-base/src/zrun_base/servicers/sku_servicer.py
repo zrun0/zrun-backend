@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, Any
 
 from zrun_base.logic.domain import CreateSkuInput, SkuDomain, UpdateSkuInput
 from zrun_core import USER_ID_CTX_KEY, get_async_transaction, get_logger
-from zrun_core.domain import abort_with_error
+from zrun_core.errors import abort_with_error
+from zrun_schema.generated.base import sku_pb2 as base_sku_pb2
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -22,7 +23,7 @@ if TYPE_CHECKING:
 logger = get_logger()
 
 
-def _domain_to_proto(sku: SkuDomain) -> Any:  # type: ignore[no-any-return]
+def _domain_to_proto(sku: SkuDomain) -> Any:
     """Convert a SkuDomain to protobuf SKU message.
 
     Args:
@@ -31,9 +32,6 @@ def _domain_to_proto(sku: SkuDomain) -> Any:  # type: ignore[no-any-return]
     Returns:
         A protobuf SKU message.
     """
-    # Import here to avoid circular imports
-    from zrun_schema.generated.base import sku_pb2 as base_sku_pb2  # type: ignore[import]
-
     return base_sku_pb2.Sku(  # type: ignore[attr-defined]
         id=sku.id,
         code=sku.code,
@@ -83,7 +81,7 @@ class SkuServicer:
     async def _with_repo(
         self,
         coro: Callable[[SkuRepositoryProtocol], Any],
-    ) -> Any:
+    ) -> Any:  # noqa: ANN401
         """Execute a coroutine with a repository in a transaction.
 
         Args:
@@ -103,9 +101,9 @@ class SkuServicer:
 
     async def CreateSku(
         self,
-        request: Any,
-        context: ServicerContext[Any, Any],  # type: ignore[misc]
-    ) -> Any:
+        request: base_sku_pb2.CreateSkuRequest,  # type: ignore[attr-defined]
+        context: ServicerContext,
+    ) -> base_sku_pb2.CreateSkuResponse:  # type: ignore[attr-defined]
         """Create a new SKU.
 
         Args:
@@ -126,9 +124,6 @@ class SkuServicer:
         )
 
         try:
-            # Import here to avoid circular imports
-            from zrun_schema.generated.base import sku_pb2 as base_sku_pb2
-
             input = CreateSkuInput(
                 code=request.code,
                 name=request.name,
@@ -170,9 +165,9 @@ class SkuServicer:
 
     async def GetSku(
         self,
-        request: Any,
-        context: ServicerContext[Any, Any],  # type: ignore[misc]
-    ) -> Any:
+        request: base_sku_pb2.GetSkuRequest,  # type: ignore[attr-defined]
+        context: ServicerContext,
+    ) -> base_sku_pb2.GetSkuResponse:  # type: ignore[attr-defined]
         """Get an existing SKU by ID.
 
         Args:
@@ -194,9 +189,6 @@ class SkuServicer:
             sku = await self._with_repo(lambda repo: self._get_sku(repo, request.sku_id))
 
             logger.info("get_sku_success", sku_id=sku.id, user_id=user_id)
-
-            # Import here to avoid circular imports
-            from zrun_schema.generated.base import sku_pb2 as base_sku_pb2
 
             return base_sku_pb2.GetSkuResponse(  # type: ignore[attr-defined]
                 sku=_domain_to_proto(sku),
@@ -229,9 +221,9 @@ class SkuServicer:
 
     async def UpdateSku(
         self,
-        request: Any,
-        context: ServicerContext[Any, Any],  # type: ignore[misc]
-    ) -> Any:
+        request: base_sku_pb2.UpdateSkuRequest,  # type: ignore[attr-defined]
+        context: ServicerContext,
+    ) -> base_sku_pb2.UpdateSkuResponse:  # type: ignore[attr-defined]
         """Update an existing SKU.
 
         Args:
@@ -259,9 +251,6 @@ class SkuServicer:
             sku = await self._with_repo(lambda repo: self._update_sku(repo, input))
 
             logger.info("update_sku_success", sku_id=sku.id, user_id=user_id)
-
-            # Import here to avoid circular imports
-            from zrun_schema.generated.base import sku_pb2 as base_sku_pb2
 
             return base_sku_pb2.UpdateSkuResponse(  # type: ignore[attr-defined]
                 sku=_domain_to_proto(sku),
@@ -294,9 +283,9 @@ class SkuServicer:
 
     async def DeleteSku(
         self,
-        request: Any,
-        context: ServicerContext[Any, Any],  # type: ignore[misc]
-    ) -> Any:
+        request: base_sku_pb2.DeleteSkuRequest,  # type: ignore[attr-defined]
+        context: ServicerContext,
+    ) -> base_sku_pb2.DeleteSkuResponse:  # type: ignore[attr-defined]
         """Delete an SKU.
 
         Args:
@@ -318,9 +307,6 @@ class SkuServicer:
             await self._with_repo(lambda repo: self._delete_sku(repo, request.sku_id))
 
             logger.info("delete_sku_success", sku_id=request.sku_id, user_id=user_id)
-
-            # Import here to avoid circular imports
-            from zrun_schema.generated.base import sku_pb2 as base_sku_pb2
 
             return base_sku_pb2.DeleteSkuResponse()  # type: ignore[attr-defined]
 
@@ -348,9 +334,9 @@ class SkuServicer:
 
     async def ListSkus(
         self,
-        request: Any,
-        context: ServicerContext[Any, Any],  # type: ignore[misc]
-    ) -> Any:
+        request: base_sku_pb2.ListSkusRequest,  # type: ignore[attr-defined]
+        context: ServicerContext,
+    ) -> base_sku_pb2.ListSkusResponse:  # type: ignore[attr-defined]
         """List SKUs with pagination.
 
         Args:
@@ -395,9 +381,6 @@ class SkuServicer:
                 next_page_token=next_page_token,
                 user_id=user_id,
             )
-
-            # Import here to avoid circular imports
-            from zrun_schema.generated.base import sku_pb2 as base_sku_pb2
 
             return base_sku_pb2.ListSkusResponse(  # type: ignore[attr-defined]
                 skus=[_domain_to_proto(sku) for sku in skus],
