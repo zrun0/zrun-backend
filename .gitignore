@@ -151,6 +151,7 @@ shared/zrun-schema/src/zrun_schema/generated/
 # IDE
 .idea/
 .vscode/
+.zed/
 *.swp
 *.swo
 *~
