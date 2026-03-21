@@ -1,0 +1,73 @@
+# =============================================================================
+# RUFF (Linting & Formatting)
+# =============================================================================
+# Extremely fast Python linter and code formatter.
+# Reference: https://docs.astral.sh/ruff/
+
+# =============================================================================
+# GENERAL SETTINGS
+# =============================================================================
+
+line-length = 100
+target-version = "py314"
+
+exclude = [
+    ".git",
+    ".venv",
+    ".uv",
+    "build/",
+    "dist/",
+    "shared/zrun-schema/src/zrun_schema/generated/",
+]
+
+# =============================================================================
+# LINT RULES
+# =============================================================================
+
+[lint]
+select = [
+    "E",      # pycodestyle errors
+    "F",      # pyflakes
+    "I",      # isort
+    "N",      # pep8-naming
+    "W",      # pycodestyle warnings
+    "UP",     # pyupgrade
+    "ASYNC",  # flake8-async
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "DTZ",    # flake8-datetimez
+    "T10",    # flake8-debugger
+    "EM",     # flake8-errmsg
+    "ISC",    # flake8-implicit-str-concat
+    "ICN",    # flake8-import-conventions
+    "G",      # flake8-logging-format
+    "PIE",    # flake8-pie
+    "PT",     # flake8-pytest-style
+    "Q",      # flake8-quotes
+    "RSE",    # flake8-raise
+    "RET",    # flake8-return
+    "SIM",    # flake8-simplify
+    "TID",    # flake8-tidy-imports
+    "TCH",    # flake8-type-checking
+    "ARG",    # flake8-unused-arguments
+    "PTH",    # flake8-use-pathlib
+    "ERA",    # eradicate
+]
+
+# =============================================================================
+# PER-FILE IGNORES
+# =============================================================================
+
+[lint.per-file-ignores]
+"**/generated/*.py" = ["ALL"]
+"__init__.py" = ["F401"]
+"**/tests/**/*.py" = ["ARG001", "TCH002", "TCH003"]
+"**/*_servicer.py" = ["N802"]
+"**/api/*.py" = ["TC002"]
+
+# =============================================================================
+# ISORT SETTINGS
+# =============================================================================
+
+[lint.isort]
+known-first-party = ["zrun_core", "zrun_schema", "zrun_base", "zrun_stock", "zrun_ops", "zrun_integration", "zrun_analytics"]

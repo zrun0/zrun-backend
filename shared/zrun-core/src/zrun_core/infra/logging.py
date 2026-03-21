@@ -100,7 +100,7 @@ def configure_structlog(
         logger_factory = structlog.PrintLoggerFactory()
 
     structlog.configure(
-        processors=processors,  # type: ignore[arg-type]
+        processors=processors,
         wrapper_class=structlog.make_filtering_bound_logger(
             getattr(logging, log_level.upper()),
         ),
@@ -119,7 +119,7 @@ def get_logger(**kwargs: Any) -> structlog.stdlib.BoundLogger:
     Returns:
         A bound logger instance.
     """
-    return structlog.get_logger(**kwargs)  # type: ignore[no-any-return]
+    return structlog.get_logger(**kwargs)
 
 
 class LoggerMixin:

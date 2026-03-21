@@ -10,6 +10,8 @@ from sqlalchemy.exc import IntegrityError
 from zrun_core.errors import ConflictError, NotFoundError
 
 if TYPE_CHECKING:
+    import builtins
+
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from zrun_base.logic.domain import SkuDomain
@@ -163,7 +165,7 @@ class SkuRepository:
         self,
         limit: int = 100,
         offset: int = 0,
-    ) -> list[SkuDomain]:
+    ) -> builtins.list[SkuDomain]:
         """List SKUs with pagination.
 
         Args:

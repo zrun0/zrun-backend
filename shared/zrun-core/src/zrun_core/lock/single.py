@@ -112,7 +112,7 @@ class SingleNodeLock:
             self._watchdog_task = None
 
         # Release using Lua script
-        result = await self._redis.eval(  # type: ignore[misc]
+        result = await self._redis.eval(  # type: ignore[no-any-await]
             self.RELEASE_SCRIPT,
             1,
             self._key,

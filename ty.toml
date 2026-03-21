@@ -1,0 +1,76 @@
+# =============================================================================
+# TY (Type Checker Configuration)
+# =============================================================================
+# Extremely fast Python type checker and language server by Astral.
+# Reference: https://docs.astral.sh/ty/
+
+# =============================================================================
+# SOURCE CONFIGURATION
+# =============================================================================
+
+[src]
+include = ["services", "shared"]
+exclude = [
+    "**/tests/**",
+    "shared/zrun-schema/src/zrun_schema/generated/**",
+]
+
+# =============================================================================
+# ENVIRONMENT SETTINGS
+# =============================================================================
+
+[environment]
+python-version = "3.14"
+python-platform = "linux"
+root = ["services", "shared"]
+
+# =============================================================================
+# LAYERED TYPE SAFETY OVERRIDES
+# =============================================================================
+# The zrun-backend uses a layered architecture with different type safety
+# requirements per layer:
+#
+# - Servicers: Permissive (allow unknown types for external API handling)
+# - Logic: Strict (enforce type safety for business logic)
+# - Repository: Strict (enforce type safety for data access)
+# - Core: Permissive (allow flexibility for infrastructure code)
+
+# === Permissive Layer: Servicers ===
+# Allow unknown types for external API handling
+[[overrides]]
+include = ["services/*/src/servicers/**"]
+
+[overrides.rules]
+possibly-missing-import = "ignore"
+unresolved-attribute = "ignore"
+possibly-unresolved-reference = "ignore"
+
+# === Strict Layer: Logic ===
+# Enforce type safety for business logic
+[[overrides]]
+include = ["services/*/src/logic/**"]
+
+[overrides.rules]
+possibly-missing-import = "error"
+unresolved-attribute = "error"
+possibly-unresolved-reference = "error"
+
+# === Strict Layer: Repository ===
+# Enforce type safety for data access
+[[overrides]]
+include = ["services/*/src/repository/**"]
+
+[overrides.rules]
+possibly-missing-import = "error"
+unresolved-attribute = "error"
+possibly-unresolved-reference = "error"
+
+# === Permissive Layer: Core Package ===
+# Allow flexibility for infrastructure code
+[[overrides]]
+include = ["shared/zrun-core/src/**"]
+
+[overrides.rules]
+possibly-missing-import = "ignore"
+unresolved-attribute = "ignore"
+possibly-unresolved-reference = "ignore"

@@ -37,7 +37,7 @@ def create_session_factory(
     """
 
     @asynccontextmanager
-    async def _factory():  # type: ignore[misc]
+    async def _factory():
         async with get_async_session(engine) as session:
             yield session
 
@@ -78,7 +78,7 @@ async def main() -> int:
         # Register servicers with their gRPC classes
         from zrun_schema.generated.base import sku_pb2_grpc as base_sku_pb2_grpc
 
-        servicers = [  # type: ignore[list-item]
+        servicers = [
             (base_sku_pb2_grpc.add_SkuServiceServicer_to_server, sku_servicer),
         ]
 

@@ -174,9 +174,9 @@ class BaseGRPCServer(LoggerMixin):
 
 
 async def run_service(
-    servicers: Sequence[tuple[Callable[[object, Server], None], object]],  # type: ignore[name-defined]
+    servicers: Sequence[tuple[Callable[[object, Server], None], object]],
     config: ServiceConfig,
-    engine: Engine | None = None,  # type: ignore[name-defined]
+    engine: Engine | None = None,
     *,
     service_name: str = "zrun-service",
 ) -> int:
@@ -228,7 +228,7 @@ async def run_service(
     # Register servicers
     if server._server is not None:
         for register_fn, servicer_instance in servicers:
-            register_fn(  # type: ignore[no-untyped-call]
+            register_fn(
                 servicer_instance,
                 server._server,
             )

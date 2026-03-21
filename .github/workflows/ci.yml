@@ -8,6 +8,7 @@ on:
 
 env:
   PYTHON_VERSION: "3.14"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   lint:
@@ -30,6 +31,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v2
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: '1.65.0'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       - uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
@@ -37,8 +43,8 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: uv sync --all-packages
-      - run: uv run just proto
-      - run: uv run basedpyright services/*/src shared/*/src
+      - run: just proto
+      - run: uv run ty check services/*/src shared/*/src
 
   test:
     name: Test zrun-base
@@ -47,6 +53,11 @@ jobs:
       DATABASE_BACKEND: sqlite
     steps:
       - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v2
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: '1.65.0'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       - uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
@@ -54,7 +65,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: uv sync --all-packages
-      - run: uv run just proto
+      - run: just proto
       - run: uv run pytest services/zrun-base/tests/ -v
 
   proto-check:
@@ -64,7 +75,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: bufbuild/buf-setup-action@v1
         with:
-          version: 'latest'
+          version: '1.65.0'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       - run: buf lint
       - run: buf format --diff
 

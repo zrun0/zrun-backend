@@ -2,7 +2,7 @@
 # zrun-backend Monorepo Configuration
 # =============================================================================
 # Production-grade Python microservices using uv workspaces.
-# Python: >=3.14 | Tools: uv, ruff, basedpyright, pytest
+# Python: >=3.14 | Tools: uv, ruff, ty, pytest
 # =============================================================================
 
 [project]
@@ -52,6 +52,7 @@ override-dependencies = [
     "sqlalchemy==2.0.48",
     "aiosqlite==0.22.1",
     "asyncpg==0.31.0",
+    "greenlet>=3.0.0",  # Required by SQLAlchemy async (aiosqlite doesn't include it)
 
     # ─────────────────────────────────────────────────────────────
     # gRPC & Protocol Buffers
@@ -70,9 +71,9 @@ override-dependencies = [
     # Utilities
     # ─────────────────────────────────────────────────────────────
     "structlog==25.5.0",
-    "pyjwt==2.11.0",
+    "pyjwt==2.12.1",
     "python-dateutil==2.9.0.post0",
-    "cachetools==7.0.2",
+    "cachetools==7.0.5",
 
     # ─────────────────────────────────────────────────────────────
     # Testing (Dev Dependencies)
@@ -84,65 +85,10 @@ override-dependencies = [
     # ─────────────────────────────────────────────────────────────
     # Development Tools
     # ─────────────────────────────────────────────────────────────
-    "basedpyright==1.38.2",
-    "ruff==0.15.4",
+    "ty==0.0.24",
+    "ruff==0.15.7",
+    "pyright==1.1.408"      # For claude code lsp
 ]
-
-# =============================================================================
-# RUFF (Linting & Formatting)
-# =============================================================================
-
-[tool.ruff]
-line-length = 100
-target-version = "py314"
-exclude = [
-    ".git",
-    ".venv",
-    ".uv",
-    "build/",
-    "dist/",
-    "shared/zrun-schema/src/zrun_schema/generated/",
-]
-
-[tool.ruff.lint]
-select = [
-    "E",      # pycodestyle errors
-    "F",      # pyflakes
-    "I",      # isort
-    "N",      # pep8-naming
-    "W",      # pycodestyle warnings
-    "UP",     # pyupgrade
-    "ASYNC",  # flake8-async
-    "B",      # flake8-bugbear
-    "C4",     # flake8-comprehensions
-    "DTZ",    # flake8-datetimez
-    "T10",    # flake8-debugger
-    "EM",     # flake8-errmsg
-    "ISC",    # flake8-implicit-str-concat
-    "ICN",    # flake8-import-conventions
-    "G",      # flake8-logging-format
-    "PIE",    # flake8-pie
-    "PT",     # flake8-pytest-style
-    "Q",      # flake8-quotes
-    "RSE",    # flake8-raise
-    "RET",    # flake8-return
-    "SIM",    # flake8-simplify
-    "TID",    # flake8-tidy-imports
-    "TCH",    # flake8-type-checking
-    "ARG",    # flake8-unused-arguments
-    "PTH",    # flake8-use-pathlib
-    "ERA",    # eradicate
-]
-
-[tool.ruff.lint.per-file-ignores]
-"**/generated/*.py" = ["ALL"]
-"__init__.py" = ["F401"]
-"**/tests/**/*.py" = ["ARG001", "TCH002", "TCH003"]
-"**/*_servicer.py" = ["N802"]
-"**/api/*.py" = ["TC002"]
-
-[tool.ruff.lint.isort]
-known-first-party = ["zrun_core", "zrun_schema", "zrun_base", "zrun_stock", "zrun_ops", "zrun_integration", "zrun_analytics"]
 
 # =============================================================================
 # PYTEST (Testing)
@@ -166,9 +112,10 @@ filterwarnings = [
 
 [dependency-groups]
 dev = [
-    "basedpyright",
+    "ty",
     "ruff",
     "pytest",
     "pytest-asyncio",
     "pytest-cov",
+    "pyright"       # For claude code lsp
 ]

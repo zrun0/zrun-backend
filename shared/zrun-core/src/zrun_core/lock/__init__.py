@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 from zrun_core.lock.distributed import Redlock
 from zrun_core.lock.factory import create_lock
-from zrun_core.lock.interface import (
+from zrun_core.lock.protocols import (
     DistributedLock,
     LockAcquisitionError,
     LockError,

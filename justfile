@@ -202,10 +202,12 @@ lint-fix-unsafe:
     @echo "==> Fixing linting issues (including unsafe)..."
     uv run ruff check --fix --unsafe-fixes .
 
-# Type check with basedpyright (core packages only)
+# Type check with ty (core packages only)
 typecheck:
-    @echo "==> Type checking..."
-    uv run basedpyright services/*/src shared/*/src
+    #!/usr/bin/env bash
+    set -e
+    echo "==> Type checking..."
+    uv run ty check services/*/src shared/*/src
 
 # Run all quality checks (format, lint, type, proto)
 check: format-check lint typecheck proto-check
@@ -227,7 +229,7 @@ test service:
     echo "==> Testing $SERVICE"
     echo "   Ruff check..." && (cd "$SERVICE_DIR" && uv run ruff check .) || exit 1
     echo "   Ruff format check..." && (cd "$SERVICE_DIR" && uv run ruff format --check .) || exit 1
-    echo "   Basedpyright type check..." && (cd "$SERVICE_DIR" && uv run basedpyright .) || exit 1
+    echo "   Ty type check..." && (cd "$SERVICE_DIR" && uv run ty check .) || exit 1
     echo "   Pytest (SQLite)..." && (cd "$SERVICE_DIR" && DATABASE_BACKEND=sqlite uv run pytest) || exit 1
 
     echo ""

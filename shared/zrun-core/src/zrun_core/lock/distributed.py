@@ -208,7 +208,7 @@ class Redlock:
         tasks = []
         for client in self._clients:
             tasks.append(
-                client.eval(  # type: ignore[misc]
+                client.eval(
                     self.RELEASE_SCRIPT,
                     1,
                     self._key,

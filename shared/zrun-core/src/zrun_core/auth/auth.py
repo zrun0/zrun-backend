@@ -59,7 +59,7 @@ class JWKSFetchError(Exception):
         super().__init__(message)
 
 
-class AuthInterceptor(ServerInterceptor):  # type: ignore[misc]
+class AuthInterceptor(ServerInterceptor):
     """gRPC interceptor for JWT authentication.
 
     This interceptor validates JWT tokens using JWKS (JSON Web Key Set)
@@ -104,7 +104,7 @@ class AuthInterceptor(ServerInterceptor):  # type: ignore[misc]
         try:
             response = await self._client.get(self._jwks_url)
             response.raise_for_status()
-            return response.json()  # type: ignore[no-any-return]
+            return response.json()
         except httpx.HTTPError as e:
             msg = f"Failed to fetch JWKS: {e}"
             raise JWKSFetchError(msg) from e
@@ -179,7 +179,7 @@ class AuthInterceptor(ServerInterceptor):  # type: ignore[misc]
             # Add padding if needed
             payload += "=" * (4 - len(payload) % 4)
             decoded = base64.urlsafe_b64decode(payload)
-            return json.loads(decoded)  # type: ignore[no-any-return]
+            return json.loads(decoded)
         except Exception:
             return None
 

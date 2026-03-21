@@ -1,4 +1,4 @@
-"""Distributed lock protocol and exceptions."""
+"""Distributed lock protocols and exceptions."""
 
 from __future__ import annotations
 

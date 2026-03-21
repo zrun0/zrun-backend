@@ -10,7 +10,7 @@ from zrun_core.lock.single import SingleNodeLock
 if TYPE_CHECKING:
     from redis.asyncio import Redis as AsyncRedis
 
-    from zrun_core.lock.interface import DistributedLock
+    from zrun_core.lock.protocols import DistributedLock
 
 
 def create_lock(
