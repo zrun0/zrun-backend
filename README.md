@@ -77,8 +77,7 @@ just lint
 2. **Proto files only in `shared/zrun-schema/protos/`** - single source of truth
 3. **Shared infrastructure in `zrun-core`** - common utilities for all services
 4. **Layered architecture** - Servicer → Logic → Repository
-5. **English only** - all code, comments, and documentation
 
 ## License
 
-Internal use only.
+MIT
