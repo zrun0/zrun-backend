@@ -21,7 +21,7 @@ default:
 _validate-service service:
     #!/usr/bin/env bash
     set -e
-    SERVICE="{{service}}"
+    SERVICE="{{ service }}"
     SERVICE_DIR="services/$SERVICE"
 
     if [ ! -d "$SERVICE_DIR" ]; then
@@ -48,13 +48,12 @@ _validate-service service:
 
 # Initialize the workspace (sync all packages)
 init:
-    @echo "==> Initializing workspace..."
+    #!/usr/bin/env bash
+    set -e
+    echo "==> Initializing workspace..."
     uv sync --all-packages
-
-# Install development dependencies
-install-dev:
-    @echo "==> Installing development dependencies..."
-    uv add --dev -o pyproject.toml mypy ruff pytest pytest-asyncio pytest-cov
+    echo "==> Installing workspace packages..."
+    uv pip install -e "shared/zrun-core" -e "shared/zrun-schema"
 
 # =============================================================================
 # PROTOCOL BUFFERS
@@ -95,83 +94,6 @@ proto-breaking:
 # Run all proto checks
 proto-check: proto-lint proto-format-check proto-breaking
     @echo "==> All proto checks passed"
-
-# =============================================================================
-# SERVICE MANAGEMENT
-# =============================================================================
-
-# List all available services
-list:
-    #!/usr/bin/env bash
-    echo "Services:"
-    for dir in services/*/; do
-        if [ -d "$dir" ]; then
-            name=$(basename "$dir")
-            module_name=${name//-/_}
-            if [ -f "$dir/src/$module_name/main.py" ]; then
-                echo "  • $name (ready)"
-            else
-                echo "  • $name (not implemented)"
-            fi
-        fi
-    done
-
-# Show detailed information about a service
-info service:
-    #!/usr/bin/env bash
-    SERVICE="{{service}}"
-    SERVICE_DIR="services/$SERVICE"
-    MODULE_NAME=${SERVICE//-/_}
-
-    echo "Service: $SERVICE"
-    echo "Module: $MODULE_NAME"
-    echo ""
-
-    if [ ! -d "$SERVICE_DIR" ]; then
-        echo "Status: ❌ Not found"
-        exit 1
-    fi
-
-    if [ -f "$SERVICE_DIR/src/$MODULE_NAME/main.py" ]; then
-        echo "Status: ✓ Ready"
-        echo ""
-        echo "Files:"
-        [ -f "$SERVICE_DIR/pyproject.toml" ] && echo "  • pyproject.toml"
-        [ -d "$SERVICE_DIR/src/$MODULE_NAME" ] && echo "  • src/$MODULE_NAME/"
-        [ -d "$SERVICE_DIR/tests" ] && echo "  • tests/"
-    else
-        echo "Status: ⚠ Not implemented"
-    fi
-
-# Run a service (PostgreSQL by default, falls back to SQLite)
-run service:
-    #!/usr/bin/env bash
-    set -e
-    SERVICE="{{service}}"
-    SERVICE_DIR="services/$SERVICE"
-    MODULE_NAME=${SERVICE//-/_}
-
-    just _validate-service {{service}}
-
-    if [ -z "$DATABASE_URL" ] && [ -z "$POSTGRES_URL" ]; then
-        echo "⚠ Warning: DATABASE_URL not set, using SQLite for development"
-        export DATABASE_BACKEND=sqlite
-    fi
-
-    echo "==> Starting $SERVICE..."
-    cd "$SERVICE_DIR" && uv run python -m "$MODULE_NAME".main
-
-# Run a service with SQLite (for development)
-dev service:
-    #!/usr/bin/env bash
-    set -e
-    SERVICE="{{service}}"
-    SERVICE_DIR="services/$SERVICE"
-    MODULE_NAME=${SERVICE//-/_}
-
-    just _validate-service {{service}}
-    echo "==> Starting $SERVICE (SQLite backend)..."
-    cd "$SERVICE_DIR" && DATABASE_BACKEND=sqlite uv run python -m "$MODULE_NAME".main
 
 # =============================================================================
 # CODE QUALITY
@@ -220,10 +142,10 @@ check: format-check lint typecheck proto-check
 # Run all tests for a service (lint + format + type + pytest)
 test service:
     #!/usr/bin/env bash
-    SERVICE="{{service}}"
+    SERVICE="{{ service }}"
     SERVICE_DIR="services/$SERVICE"
 
-    just _validate-service {{service}}
+    just _validate-service {{ service }}
 
     echo ""
     echo "==> Testing $SERVICE"
@@ -238,29 +160,98 @@ test service:
 # Run unit tests only
 test-unit service:
     #!/usr/bin/env bash
-    SERVICE="{{service}}"
+    SERVICE="{{ service }}"
     SERVICE_DIR="services/$SERVICE"
 
-    just _validate-service {{service}}
+    just _validate-service {{ service }}
     cd "$SERVICE_DIR" && DATABASE_BACKEND=sqlite uv run pytest tests/unit/ -v
 
 # Run integration tests only
 test-integration service:
     #!/usr/bin/env bash
-    SERVICE="{{service}}"
+    SERVICE="{{ service }}"
     SERVICE_DIR="services/$SERVICE"
 
-    just _validate-service {{service}}
+    just _validate-service {{ service }}
     cd "$SERVICE_DIR" && DATABASE_BACKEND=sqlite uv run pytest tests/integration/ -v
 
 # Run tests with coverage report
 test-cov service:
     #!/usr/bin/env bash
-    SERVICE="{{service}}"
+    SERVICE="{{ service }}"
     SERVICE_DIR="services/$SERVICE"
 
-    just _validate-service {{service}}
+    just _validate-service {{ service }}
     cd "$SERVICE_DIR" && DATABASE_BACKEND=sqlite uv run pytest --cov=src --cov-report=html --cov-report=term
+
+# =============================================================================
+# SERVICE MANAGEMENT
+# =============================================================================
+
+# List all available services
+list:
+    #!/usr/bin/env bash
+    echo "Services:"
+    for dir in services/*/; do
+        if [ -d "$dir" ]; then
+            name=$(basename "$dir")
+            module_name=${name//-/_}
+            if [ -f "$dir/src/$module_name/main.py" ]; then
+                echo "  • $name (ready)"
+            else
+                echo "  • $name (not implemented)"
+            fi
+        fi
+    done
+
+# Show detailed information about a service
+info service:
+    #!/usr/bin/env bash
+    SERVICE="{{ service }}"
+    SERVICE_DIR="services/$SERVICE"
+    MODULE_NAME=${SERVICE//-/_}
+
+    echo "Service: $SERVICE"
+    echo "Module: $MODULE_NAME"
+    echo ""
+
+    if [ ! -d "$SERVICE_DIR" ]; then
+        echo "Status: ❌ Not found"
+        exit 1
+    fi
+
+    if [ -f "$SERVICE_DIR/src/$MODULE_NAME/main.py" ]; then
+        echo "Status: ✓ Ready"
+        echo ""
+        echo "Files:"
+        [ -f "$SERVICE_DIR/pyproject.toml" ] && echo "  • pyproject.toml"
+        [ -d "$SERVICE_DIR/src/$MODULE_NAME" ] && echo "  • src/$MODULE_NAME/"
+        [ -d "$SERVICE_DIR/tests" ] && echo "  • tests/"
+    else
+        echo "Status: ⚠ Not implemented"
+    fi
+
+# Run a service (PostgreSQL by default, falls back to SQLite)
+run service:
+    #!/usr/bin/env bash
+    set -e
+    SERVICE="{{ service }}"
+    SERVICE_DIR="services/$SERVICE"
+    MODULE_NAME=${SERVICE//-/_}
+
+    just _validate-service {{ service }}
+
+    if [ -z "$DATABASE_URL" ]; then
+        echo "⚠ Warning: DATABASE_URL not set, using SQLite for development"
+        export DATABASE_BACKEND=sqlite
+    fi
+
+    echo "==> Starting $SERVICE..."
+    cd "$SERVICE_DIR" && uv run python -m "$MODULE_NAME".main
+
+# Run a service with SQLite (for development)
+dev service:
+    DATABASE_BACKEND=sqlite just run {{ service }}
 
 # =============================================================================
 # BUILD & CLEANUP
@@ -287,78 +278,6 @@ rebuild: deep-clean init proto
     @echo "==> Rebuild complete"
 
 # =============================================================================
-# HELPERS
-# =============================================================================
-
-# Show project architecture
-arch:
-    @echo "Architecture:"
-    @echo ""
-    @echo "Database Backends:"
-    @echo "  • SQLite     - Testing/Development (fast, no external deps)"
-    @echo "  • PostgreSQL - Production (reliable, scalable)"
-    @echo ""
-    @echo "zrun-backend/"
-    @echo "├── shared/"
-    @echo "│   ├── zrun-core/       # Infrastructure (auth, logging, locking)"
-    @echo "│   └── zrun-schema/     # Proto definitions & generated code"
-    @echo "├── services/"
-    @echo "│   ├── zrun-base/      # Core business service (SKU management)"
-    @echo "│   ├── zrun-stock/     # Stock management"
-    @echo "│   ├── zrun-ops/       # Operations"
-    @echo "│   ├── zrun-integration/ # Third-party integrations"
-    @echo "│   └── zrun-analytics/ # Analytics"
-
-# Show quick reference for common commands
-help:
-    @echo "Quick Reference:"
-    @echo ""
-    @echo "Setup:"
-    @echo "  just init           # Initialize workspace"
-    @echo "  just install-dev    # Install dev dependencies"
-    @echo ""
-    @echo "Proto:"
-    @echo "  just proto          # Compile proto files"
-    @echo "  just proto-check    # Run all proto checks"
-    @echo ""
-    @echo "Services:"
-    @echo "  just list           # List all services"
-    @echo "  just info <svc>     # Show service details"
-    @echo "  just dev <svc>      # Run service (SQLite)"
-    @echo "  just run <svc>      # Run service (PostgreSQL)"
-    @echo ""
-    @echo "Quality:"
-    @echo "  just format         # Format code"
-    @echo "  just lint           # Lint code"
-    @echo "  just typecheck      # Type check"
-    @echo "  just check          # Run all checks"
-    @echo ""
-    @echo "Testing:"
-    @echo "  just test <svc>     # Full test suite"
-    @echo "  just test-unit <svc>   # Unit tests only"
-    @echo "  just test-integration <svc> # Integration tests"
-    @echo "  just test-cov <svc>     # With coverage"
-    @echo ""
-    @echo "Environment Variables:"
-    @echo "  DATABASE_URL       # PostgreSQL connection string"
-    @echo "  DATABASE_BACKEND   # Override: postgresql or sqlite"
-    @echo ""
-    @echo "Cleanup:"
-    @echo "  just clean          # Clean generated files"
-    @echo "  just rebuild        # Rebuild from scratch"
-
-# =============================================================================
-# ALIASES
-# =============================================================================
-
-# Alias for list
-ls: list
-
-# Alias for test
-t service:
-    just test {{service}}
-
-# =============================================================================
 # CONTAINER (Docker)
 # =============================================================================
 
@@ -369,8 +288,8 @@ docker-build-base:
 
 # Build a service container image
 docker-build service:
-    @echo "==> Building {{service}}..."
-    docker build -f docker/Dockerfile --build-arg SERVICE={{service}} -t {{service}}:latest .
+    @echo "==> Building {{ service }}..."
+    docker build -f docker/Dockerfile --build-arg SERVICE={{ service }} -t {{ service }}:latest .
 
 # Build all service containers (includes base image)
 docker-build-all: docker-build-base
@@ -382,10 +301,10 @@ docker-build-all: docker-build-base
 
 # Push image to registry (requires REGISTRY env var)
 docker-push service:
-    @echo "==> Pushing {{service}} to ${REGISTRY}..."
+    @echo "==> Pushing {{ service }} to ${REGISTRY}..."
     @if [ -z "$$REGISTRY" ]; then echo "Error: REGISTRY env var not set"; exit 1; fi
-    docker tag {{service}}:latest ${REGISTRY}/{{service}}:latest
-    docker push ${REGISTRY}/{{service}}:latest
+    docker tag {{ service }}:latest ${REGISTRY}/{{ service }}:latest
+    docker push ${REGISTRY}/{{ service }}:latest
 
 # Clean up docker resources
 docker-clean:
@@ -413,3 +332,44 @@ version-sync:
 version-check:
     @echo "=== All package versions ==="
     @rg "^version" pyproject.toml shared/*/pyproject.toml services/*/pyproject.toml 2>/dev/null | sort
+
+# =============================================================================
+# HELPERS
+# =============================================================================
+
+# Show quick reference for common commands
+help:
+    @echo "Quick Reference:"
+    @echo ""
+    @echo "Setup:"
+    @echo "  just init           # Initialize workspace"
+    @echo ""
+    @echo "Proto:"
+    @echo "  just proto          # Compile proto files"
+    @echo "  just proto-check    # Run all proto checks"
+    @echo ""
+    @echo "Quality:"
+    @echo "  just format         # Format code"
+    @echo "  just lint           # Lint code"
+    @echo "  just typecheck      # Type check"
+    @echo "  just check          # Run all checks"
+    @echo ""
+    @echo "Testing:"
+    @echo "  just test <svc>     # Full test suite"
+    @echo "  just test-unit <svc>   # Unit tests only"
+    @echo "  just test-integration <svc> # Integration tests"
+    @echo "  just test-cov <svc>     # With coverage"
+    @echo ""
+    @echo "Services:"
+    @echo "  just list           # List all services"
+    @echo "  just info <svc>     # Show service details"
+    @echo "  just dev <svc>      # Run service (SQLite)"
+    @echo "  just run <svc>      # Run service (PostgreSQL)"
+    @echo ""
+    @echo "Cleanup:"
+    @echo "  just clean          # Clean generated files"
+    @echo "  just rebuild        # Rebuild from scratch"
+    @echo ""
+    @echo "Environment Variables:"
+    @echo "  DATABASE_URL       # PostgreSQL connection string"
+    @echo "  DATABASE_BACKEND   # Override: postgresql or sqlite"
