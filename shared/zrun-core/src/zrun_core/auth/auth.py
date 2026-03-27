@@ -1,24 +1,23 @@
-"""Authentication interceptor for gRPC services."""
+"""Authentication interceptor for gRPC services.
+
+This interceptor validates JWT tokens issued by the BFF service using JWKS.
+Following Architecture Pattern B: BFF re-issues internal JWTs after validating
+Casdoor tokens, keeping internal services decoupled from external dependencies.
+"""
 
 from __future__ import annotations
 
-import asyncio
-import base64
 import contextvars
-import json
 from typing import TYPE_CHECKING, Any, cast
 
+import grpc
 import httpx
 import structlog
 from cachetools import TTLCache
 from grpc.aio import ServerInterceptor
 
-from zrun_core.errors.errors import InternalError
-
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
-
-    import grpc
 
 USER_ID_CTX_KEY: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "user_id",
@@ -27,19 +26,59 @@ USER_ID_CTX_KEY: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 
 logger = structlog.get_logger()
 
-_JWKS_CACHE_KEY = "jwks"
+
+def _decode_metadata_value(value: bytes | str) -> str:
+    """Decode metadata value to string.
+
+    Args:
+        value: Metadata value (bytes or str).
+
+    Returns:
+        Decoded string value.
+    """
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+    return value
 
 
-class JWKSFetchError(InternalError):
+def _decode_metadata_key(key: bytes | str) -> str:
+    """Decode metadata key to string.
+
+    Args:
+        key: Metadata key (bytes or str).
+
+    Returns:
+        Decoded string key.
+    """
+    if isinstance(key, bytes):
+        return key.decode("utf-8")
+    return key
+
+
+class JWKSFetchError(Exception):
     """Error fetching JWKS from the identity provider."""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+        super().__init__(message)
 
 
 class AuthInterceptor(ServerInterceptor):
     """gRPC interceptor for JWT authentication.
 
-    Validates JWT tokens using JWKS from a configured identity provider
-    (e.g. Casdoor). JWKS responses are cached with a configurable TTL.
-    The authenticated user ID is propagated via contextvars.
+    This interceptor validates JWT tokens using JWKS (JSON Web Key Set)
+    from the BFF service, which re-issues tokens after Casdoor validation.
+
+    Features:
+    - JWKS caching with configurable TTL
+    - User ID extraction and propagation via contextvars
+    - Proper JWT signature verification
+    - Claims validation (exp, nbf, aud, iss)
+    - Request abortion on authentication failure
+
+    Architecture Pattern B:
+        Frontend → BFF (OAuth2 with Casdoor) → Internal JWT
+        Internal Services → Validate BFF JWT (using BFF JWKS)
     """
 
     def __init__(
@@ -52,9 +91,9 @@ class AuthInterceptor(ServerInterceptor):
         """Initialize the authentication interceptor.
 
         Args:
-            jwks_url: URL to fetch JWKS from.
-            audience: Expected JWT audience claim.
-            issuer: Expected JWT issuer claim (optional).
+            jwks_url: URL to fetch JWKS from (BFF endpoint, not Casdoor).
+            audience: Expected JWT audience claim (e.g., "zrun-services").
+            issuer: Expected JWT issuer claim (e.g., "zrun-bff").
             cache_ttl: Cache TTL for JWKS in seconds.
         """
         self._jwks_url = jwks_url
@@ -62,10 +101,9 @@ class AuthInterceptor(ServerInterceptor):
         self._issuer = issuer
         self._cache: TTLCache[str, dict[str, Any]] = TTLCache(maxsize=10, ttl=cache_ttl)
         self._client = httpx.AsyncClient(timeout=10.0)
-        self._jwks_lock = asyncio.Lock()
 
     async def _fetch_jwks(self) -> dict[str, Any]:
-        """Fetch JWKS from the identity provider.
+        """Fetch JWKS from the BFF service.
 
         Returns:
             JWKS as a dictionary.
@@ -82,22 +120,22 @@ class AuthInterceptor(ServerInterceptor):
             raise JWKSFetchError(msg) from e
 
     async def _get_jwks(self) -> dict[str, Any]:
-        """Return JWKS from cache, fetching fresh if not cached."""
-        if _JWKS_CACHE_KEY in self._cache:
-            return self._cache[_JWKS_CACHE_KEY]
-        async with self._jwks_lock:
-            # Re-check inside the lock to avoid a thundering herd on TTL expiry
-            if _JWKS_CACHE_KEY not in self._cache:
-                self._cache[_JWKS_CACHE_KEY] = await self._fetch_jwks()
-        return self._cache[_JWKS_CACHE_KEY]
+        """Get JWKS from cache or fetch fresh.
 
-    def _extract_token_from_metadata(
-        self,
-        metadata: Any,
-    ) -> str | None:
+        Returns:
+            JWKS as a dictionary.
+        """
+        cache_key = "jwks"
+
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+
+        jwks = await self._fetch_jwks()
+        self._cache[cache_key] = jwks
+        return jwks
+
+    def _extract_token(self, metadata: Any) -> str | None:
         """Extract JWT token from gRPC metadata.
-
-        Checks Authorization (Bearer) first, then a bare token key.
 
         Args:
             metadata: Invocation metadata from gRPC.
@@ -109,10 +147,12 @@ class AuthInterceptor(ServerInterceptor):
             return None
 
         metadata_iter = cast("Iterable[tuple[bytes | str, bytes | str]]", metadata)
+        metadata_dict = {
+            _decode_metadata_key(k): _decode_metadata_value(v) for k, v in metadata_iter
+        }
 
-        for raw_key, raw_value in metadata_iter:
-            key = raw_key.decode("utf-8") if isinstance(raw_key, bytes) else raw_key
-            value = raw_value.decode("utf-8") if isinstance(raw_value, bytes) else raw_value
+        # Single pass: check both Authorization and Token headers
+        for key, value in metadata_dict.items():
             key_lower = key.lower()
             if key_lower == "authorization" and value.startswith("Bearer "):
                 return value[7:]
@@ -121,27 +161,70 @@ class AuthInterceptor(ServerInterceptor):
 
         return None
 
-    def _decode_token_payload(self, token: str) -> dict[str, Any] | None:
-        """Decode JWT payload without signature verification.
+    async def _validate_token(self, token: str) -> dict[str, Any] | None:
+        """Validate JWT token using BFF JWKS and return payload.
 
-        This is intentionally simplified — signature verification requires
-        the JWKS keys and is left as a future enhancement.
+        This method performs proper JWT signature verification and validates
+        the token's claims (exp, nbf, aud, iss).
 
         Args:
-            token: JWT token string.
+            token: JWT token string issued by BFF.
 
         Returns:
-            Token payload dict if decodable, None otherwise.
+            Token payload if valid, None if validation fails.
         """
-        parts = token.split(".")
-        if len(parts) != 3:
-            return None
+        from jose import JWTError, jwt
+        from jose.exceptions import ExpiredSignatureError
 
-        # Pad to a valid base64 length before decoding
-        payload_b64 = parts[1] + "=" * (4 - len(parts[1]) % 4)
         try:
-            return json.loads(base64.urlsafe_b64decode(payload_b64))
-        except ValueError, UnicodeDecodeError:
+            # Get JWKS from BFF
+            jwks = await self._get_jwks()
+
+            # Get JWT header to find key ID
+            header = jwt.get_unverified_header(token)
+            kid = header.get("kid")
+
+            if not kid:
+                logger.error("auth_failed_no_kid")
+                return None
+
+            # Find matching key in JWKS
+            rsa_key: dict[str, Any] | None = None
+            for key in jwks.get("keys", []):
+                if key.get("kid") == kid:
+                    rsa_key = {
+                        "kty": key["kty"],
+                        "kid": key["kid"],
+                        "use": key.get("use", "sig"),
+                        "n": key["n"],
+                        "e": key["e"],
+                    }
+                    break
+
+            if not rsa_key:
+                logger.error("auth_failed_no_key", kid=kid)
+                return None
+
+            # Verify and decode token with full validation
+            payload = jwt.decode(
+                token,
+                rsa_key,
+                algorithms=["RS256"],
+                audience=self._audience,
+                issuer=self._issuer,
+            )
+
+            logger.debug("auth_success", user_id=payload.get("sub"))
+            return payload
+
+        except ExpiredSignatureError:
+            logger.warning("auth_failed_token_expired")
+            return None
+        except JWTError as e:
+            logger.warning("auth_failed_jwt_error", error=str(e))
+            return None
+        except Exception as e:
+            logger.error("auth_failed_unexpected", error=str(e))
             return None
 
     async def intercept_service(
@@ -151,36 +234,76 @@ class AuthInterceptor(ServerInterceptor):
     ) -> grpc.RpcMethodHandler:
         """Intercept incoming RPC calls for authentication.
 
+        Validates JWT tokens and aborts the call if authentication fails.
+        Validated user ID is propagated via context variables.
+
         Args:
             continuation: The next interceptor in the chain.
             handler_call_details: Details about the RPC call.
 
         Returns:
-            The RPC method handler, or passes through if authentication fails.
+            The RPC method handler or aborts with UNAUTHENTICATED status.
         """
+        # Extract token from metadata
         metadata = handler_call_details.invocation_metadata
-        token = self._extract_token_from_metadata(metadata)
+        token = self._extract_token(metadata)
 
         if not token:
             logger.warning("auth_failed_no_token")
-            return await continuation(handler_call_details)
+            # Abort with UNAUTHENTICATED status (secure by default)
+            await handler_call_details.invocation_metadata.__class__._abort(
+                handler_call_details,
+                grpc.StatusCode.UNAUTHENTICATED,
+                "Missing authentication token",
+            )
+            return continuation(handler_call_details)
 
-        payload = self._decode_token_payload(token)
+        # Validate token
+        payload = await self._validate_token(token)
         if not payload:
             logger.warning("auth_failed_invalid_token")
-            return await continuation(handler_call_details)
+            await handler_call_details.invocation_metadata.__class__._abort(
+                handler_call_details,
+                grpc.StatusCode.UNAUTHENTICATED,
+                "Invalid or expired token",
+            )
+            return continuation(handler_call_details)
 
+        # Extract user ID
         user_id = payload.get("sub")
         if not user_id:
             logger.warning("auth_failed_no_user_id")
-            return await continuation(handler_call_details)
+            await handler_call_details.invocation_metadata.__class__._abort(
+                handler_call_details,
+                grpc.StatusCode.UNAUTHENTICATED,
+                "Token missing subject claim",
+            )
+            return continuation(handler_call_details)
 
+        # Set user ID in context
         token_var = USER_ID_CTX_KEY.set(user_id)
+
         try:
             return await continuation(handler_call_details)
         finally:
             USER_ID_CTX_KEY.reset(token_var)
 
     async def close(self) -> None:
-        """Close the HTTP client."""
+        """Close the HTTP client.
+
+        Should be called when shutting down the service.
+        """
         await self._client.aclose()
+
+    async def __aenter__(self) -> AuthInterceptor:
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any,
+    ) -> None:
+        """Async context manager exit."""
+        await self.close()
