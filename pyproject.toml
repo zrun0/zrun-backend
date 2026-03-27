@@ -20,6 +20,7 @@ dependencies = []
 members = [
     "shared/zrun-core",
     "shared/zrun-schema",
+    "services/zrun-bff",
     "services/zrun-base",
     "services/zrun-analytics",
     "services/zrun-integration",
@@ -68,10 +69,19 @@ override-dependencies = [
     "redis==7.2.1",
 
     # ─────────────────────────────────────────────────────────────
+    # Web Framework (BFF)
+    # ─────────────────────────────────────────────────────────────
+    "fastapi==0.135.2",
+    "uvicorn==0.42.0",
+    "starlette==1.0.0",
+    "python-multipart==0.0.22",
+
+    # ─────────────────────────────────────────────────────────────
     # Utilities
     # ─────────────────────────────────────────────────────────────
     "structlog==25.5.0",
     "pyjwt==2.12.1",
+    "python-jose==3.3.0",
     "python-dateutil==2.9.0.post0",
     "cachetools==7.0.5",
 

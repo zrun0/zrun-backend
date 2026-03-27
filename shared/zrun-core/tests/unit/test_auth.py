@@ -137,8 +137,10 @@ class TestAuthInterceptor:
         interceptor._get_jwks = AsyncMock(return_value=TEST_JWKS)  # type: ignore[method-assign]
 
         # Mock jwt functions (jwt is a submodule: jose.jwt)
-        with patch("jose.jwt.get_unverified_header") as mock_get_header, \
-             patch("jose.jwt.decode") as mock_decode:
+        with (
+            patch("jose.jwt.get_unverified_header") as mock_get_header,
+            patch("jose.jwt.decode") as mock_decode,
+        ):
             mock_get_header.return_value = {"kid": "test-key-1"}
             mock_decode.return_value = {
                 "sub": "user123",
