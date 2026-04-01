@@ -36,7 +36,6 @@ class BaseGRPCServer(LoggerMixin):
         port: int,
         interceptors: list[grpc.aio.ServerInterceptor],
         max_workers: int = 10,
-        service_config: ServiceConfig | None = None,
         enable_health_check: bool = True,
     ) -> None:
         """Initialize the server.
@@ -45,18 +44,14 @@ class BaseGRPCServer(LoggerMixin):
             port: Port to listen on.
             interceptors: List of server interceptors.
             max_workers: Maximum number of worker threads.
-            service_config: Optional service configuration.
             enable_health_check: Enable gRPC health check service for K8s.
         """
         self._port = port
         self._interceptors = interceptors
         self._max_workers = max_workers
-        self._service_config = service_config
         self._enable_health_check = enable_health_check
         self._server: grpc.aio.Server | None = None
         self._shutdown_event = asyncio.Event()
-
-        # Health check servicer (set during start if enabled)
         self._health_servicer: object | None = None
 
     def _create_server(self) -> Server:
@@ -71,10 +66,7 @@ class BaseGRPCServer(LoggerMixin):
         )
 
     async def start(self) -> None:
-        """Start the gRPC server.
-
-        This will block until the server is stopped.
-        """
+        """Start the gRPC server."""
         self._server = self._create_server()
 
         # Register health check service if enabled
@@ -103,7 +95,6 @@ class BaseGRPCServer(LoggerMixin):
             health_check_enabled=self._enable_health_check,
         )
 
-        # Set up signal handlers
         self._setup_signal_handlers()
 
     def _setup_signal_handlers(self) -> None:
@@ -120,6 +111,20 @@ class BaseGRPCServer(LoggerMixin):
         """Handle termination signals."""
         self.logger.info("shutdown_signal_received")
         self._shutdown_event.set()
+
+    def get_server(self) -> Server:
+        """Get the underlying gRPC server instance.
+
+        Returns:
+            The gRPC server instance.
+
+        Raises:
+            RuntimeError: If server has not been started.
+        """
+        if self._server is None:
+            msg = "Server has not been started"
+            raise RuntimeError(msg)
+        return self._server
 
     async def stop(self, grace_period: float = 5.0) -> None:
         """Stop the gRPC server gracefully.
@@ -150,18 +155,16 @@ class BaseGRPCServer(LoggerMixin):
         if self._server is None:
             return
 
-        # Wait for shutdown signal or server termination
         tasks = [
             asyncio.create_task(self._shutdown_event.wait()),
             asyncio.create_task(self._server.wait_for_termination()),
         ]
 
-        done, pending = await asyncio.wait(
+        _, pending = await asyncio.wait(
             tasks,
             return_when=asyncio.FIRST_COMPLETED,
         )
 
-        # Cancel pending tasks
         for task in pending:
             with suppress(asyncio.CancelledError):
                 task.cancel()
@@ -198,7 +201,6 @@ async def run_service(
     Returns:
         Exit code (0 for success, non-zero for failure).
     """
-    # Configure logging
     from zrun_core.infra import configure_structlog, get_logger
 
     configure_structlog(
@@ -214,24 +216,16 @@ async def run_service(
         port=config.port,
     )
 
-    # Create and start server
     server = BaseGRPCServer(
         port=config.port,
         interceptors=[],
         max_workers=config.max_workers,
-        service_config=config,
     )
 
-    # Start the server to get the underlying gRPC server
     await server.start()
 
-    # Register servicers
-    if server._server is not None:
-        for register_fn, servicer_instance in servicers:
-            register_fn(
-                servicer_instance,
-                server._server,
-            )
+    for register_fn, servicer_instance in servicers:
+        register_fn(servicer_instance, server.get_server())
 
     try:
         await server.wait_for_termination()

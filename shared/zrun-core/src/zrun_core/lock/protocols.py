@@ -4,13 +4,25 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from zrun_core.errors.errors import ConflictError, DomainError
 
-class LockError(Exception):
+# Lua script for safe lock release (prevents deleting locks owned by other clients)
+# This script ensures only the lock owner can release it by checking the token
+RELEASE_SCRIPT = """
+if redis.call("get", KEYS[1]) == ARGV[1] then
+    return redis.call("del", KEYS[1])
+else
+    return 0
+end
+"""
+
+
+class LockError(DomainError):
     """Base exception for lock-related errors."""
 
 
-class LockAcquisitionError(LockError):
-    """Raised when lock acquisition fails."""
+class LockAcquisitionError(ConflictError):
+    """Raised when lock acquisition fails due to conflict."""
 
 
 class LockReleaseError(LockError):

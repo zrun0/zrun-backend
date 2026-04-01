@@ -5,25 +5,12 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class ServiceConfig(BaseSettings):
-    """Configuration for zrun services.
-
-    This class uses pydantic-settings to load configuration from
-    environment variables with type validation and conversion.
-
-    Environment variables:
-        ENV: Environment name (dev, staging, prod)
-        DATABASE_URL: PostgreSQL connection URL
-        REDIS_URL: Redis connection URL
-        JWKS_URL: URL to fetch JWKS from
-        JWT_AUDIENCE: Expected JWT audience
-        JWT_ISSUER: Expected JWT issuer (optional)
-        PORT: gRPC server port (default: 50051)
-        LOG_LEVEL: Logging level (default: INFO)
-    """
+    """Configuration for zrun services loaded from environment variables."""
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -43,14 +30,13 @@ class ServiceConfig(BaseSettings):
     # Redis
     redis_url: str = "redis://localhost:6379/0"
     redis_pool_size: int = 10
-    redis_db: int = 0
 
     # Distributed Lock
     lock_mode: Literal["single", "redlock"] = "single"
-    lock_redis_urls: list[str] = []  # Multi-node URLs for redlock mode
+    lock_redis_urls: list[str] = []
     lock_ttl: int = 30  # Lock TTL in seconds
-    lock_retry_times: int = 3  # Retry times for lock acquisition
-    lock_retry_delay: float = 0.2  # Retry delay in seconds
+    lock_retry_times: int = 3  # Retry attempts for lock acquisition
+    lock_retry_delay: float = 0.2  # Delay between retries in seconds
     lock_drift_factor: float = 0.01  # Clock drift factor for redlock
     lock_auto_renewal: bool = True  # Auto-renewal for single-node locks
     lock_renewal_interval: float = 0.8  # Fraction of TTL before renewal
@@ -73,6 +59,14 @@ class ServiceConfig(BaseSettings):
     enable_metrics: bool = True
     enable_tracing: bool = False
 
+    @model_validator(mode="after")
+    def validate_lock_config(self) -> ServiceConfig:
+        """Require at least one Redis URL when lock_mode is 'redlock'."""
+        if self.lock_mode == "redlock" and not self.lock_redis_urls:
+            msg = "lock_redis_urls must contain at least one URL when lock_mode is 'redlock'"
+            raise ValueError(msg)
+        return self
+
     @property
     def is_prod(self) -> bool:
         """Check if running in production."""
@@ -84,19 +78,17 @@ class ServiceConfig(BaseSettings):
         return self.env == "dev"
 
     @property
+    def is_staging(self) -> bool:
+        """Check if running in staging."""
+        return self.env == "staging"
+
+    @property
     def database_pool_min_size(self) -> int:
-        """Minimum database pool size."""
+        """Minimum pool size: half of pool_size, floored at 1."""
         return max(1, self.database_pool_size // 2)
 
 
 @lru_cache
 def get_config() -> ServiceConfig:
-    """Get the cached service configuration.
-
-    This function caches the configuration to avoid repeated
-    environment variable lookups.
-
-    Returns:
-        The service configuration.
-    """
+    """Return the cached service configuration."""
     return ServiceConfig()

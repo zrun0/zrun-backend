@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from zrun_core.lock import RedisLock
+from zrun_core.lock.protocols import RELEASE_SCRIPT
 
 
 class TestRedisLock:
@@ -155,7 +156,6 @@ class TestRedisLockScript:
 
     def test_release_script_format(self) -> None:
         """Test release script is valid Lua."""
-        script = RedisLock.RELEASE_SCRIPT
-        assert "redis.call" in script
-        assert "get" in script
-        assert "del" in script
+        assert "redis.call" in RELEASE_SCRIPT
+        assert "get" in RELEASE_SCRIPT
+        assert "del" in RELEASE_SCRIPT

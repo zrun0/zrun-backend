@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
+import time
 import uuid
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-import structlog
+from zrun_core.infra.logging import get_logger
+from zrun_core.lock.protocols import RELEASE_SCRIPT
 
 if TYPE_CHECKING:
     from redis.asyncio import Redis as AsyncRedis
 
-logger = structlog.get_logger()
+logger = get_logger()
 
 
 class Redlock:
@@ -36,208 +39,112 @@ class Redlock:
         ```
     """
 
-    # Lua script for safe lock release
-    RELEASE_SCRIPT = """
-    if redis.call("get", KEYS[1]) == ARGV[1] then
-        return redis.call("del", KEYS[1])
-    else
-        return 0
-    end
-    """
-
     def __init__(
         self,
-        redis_clients: list[AsyncRedis],
+        clients: list[AsyncRedis],
         key: str,
         ttl: int = 30,
-        drift_factor: float = 0.01,
-        retry_times: int = 3,
-        retry_delay: float = 0.2,
     ) -> None:
         """Initialize the Redlock.
 
         Args:
-            redis_clients: List of Redis client instances.
-            key: Lock key in Redis (will be prefixed with "lock:").
+            clients: List of Redis client instances (must be at least 3 for quorum).
+            key: Lock key in Redis.
             ttl: Lock TTL in seconds.
-            drift_factor: Clock drift factor to compensate for time drift.
-            retry_times: Number of retries for lock acquisition.
-            retry_delay: Delay between retries in seconds.
         """
-        if len(redis_clients) < 3:
-            logger.warning(
-                "redlock_few_nodes",
-                nodes=len(redis_clients),
-                message="Redlock requires at least 3 nodes for reliability",
-            )
-
-        self._clients = redis_clients
+        self._clients = clients
         self._key = f"lock:{key}"
         self._ttl = ttl
-        self._ttl_ms = ttl * 1000
-        self._drift_factor = drift_factor
-        self._retry_times = retry_times
-        self._retry_delay = retry_delay
-        self._quorum = len(redis_clients) // 2 + 1
         self._token: str | None = None
-        self._acquired = False
 
     async def acquire(self) -> bool:
-        """Attempt to acquire the lock.
+        """Attempt to acquire the lock across the majority of Redis nodes.
 
         Returns:
-            True if the lock was acquired, False otherwise.
+            True if the lock was acquired on a quorum of nodes, False otherwise.
         """
-        import asyncio
-
         token = str(uuid.uuid4())
+        quorum = len(self._clients) // 2 + 1
+        ttl_ms = self._ttl * 1000
 
-        for attempt in range(self._retry_times):
-            acquired_count = 0
-            start_time = asyncio.get_event_loop().time()
+        start_ms = time.monotonic() * 1000
+        acquired_count = 0
 
-            # Try to acquire lock on all nodes
-            for client in self._clients:
-                try:
-                    result = await client.set(
-                        self._key,
-                        token,
-                        nx=True,
-                        px=self._ttl_ms,
-                    )
-                    if result:
-                        acquired_count += 1
-                except Exception as e:
-                    node_id = (
-                        await client.client_id() if hasattr(client, "client_id") else "unknown"
-                    )
-                    logger.warning(
-                        "redlock_node_error",
-                        node=node_id,
-                        error=str(e),
-                    )
-
-            # Calculate elapsed time and validity
-            elapsed = (asyncio.get_event_loop().time() - start_time) / 1000  # Convert to seconds
-            drift = self._drift_factor * self._ttl
-            validity = self._ttl - elapsed - drift
-
-            # Check if we acquired lock on majority and it's still valid
-            if acquired_count >= self._quorum and validity > 0:
-                self._token = token
-                self._acquired = True
-                logger.debug(
-                    "redlock_acquired",
-                    key=self._key,
-                    nodes=acquired_count,
-                    quorum=self._quorum,
-                    validity=validity,
+        for client in self._clients:
+            try:
+                result = await client.set(
+                    self._key,
+                    token,
+                    nx=True,
+                    px=ttl_ms,
                 )
-                return True
+                if result:
+                    acquired_count += 1
+            except Exception:
+                logger.warning("redlock_node_acquire_failed", key=self._key)
 
-            # Failed to acquire, release any locks we got
-            await self._unlock_all_nodes(token)
+        elapsed_ms = time.monotonic() * 1000 - start_ms
+        validity_ms = ttl_ms - elapsed_ms
 
-            # Retry if not the last attempt
-            if attempt < self._retry_times - 1:
-                await asyncio.sleep(self._retry_delay)
+        if acquired_count >= quorum and validity_ms > 0:
+            self._token = token
+            logger.debug(
+                "redlock_acquired",
+                key=self._key,
+                nodes=acquired_count,
+                validity_ms=validity_ms,
+            )
+            return True
 
-        logger.warning("redlock_acquire_failed", key=self._key)
+        # Failed to acquire quorum — release any partial locks
+        await self._release_all(token)
         return False
 
     async def release(self) -> bool:
-        """Release the lock.
+        """Release the lock on all Redis nodes.
 
         Returns:
-            True if the lock was released, False otherwise.
+            True if the lock was released, False if it was not held.
         """
         if self._token is None:
             return False
 
-        released_count = 0
-
-        # Send release command to all nodes
-        for client in self._clients:
-            try:
-                result = await client.eval(  # type: ignore[misc]
-                    self.RELEASE_SCRIPT,
-                    1,
-                    self._key,
-                    self._token,
-                )
-                if result:
-                    released_count += 1
-            except Exception as e:
-                node_id = await client.client_id() if hasattr(client, "client_id") else "unknown"
-                logger.warning(
-                    "redlock_release_error",
-                    node=node_id,
-                    error=str(e),
-                )
-
-        success = released_count >= self._quorum
-
-        if success:
-            logger.debug(
-                "redlock_released",
-                key=self._key,
-                nodes=released_count,
-            )
-        else:
-            logger.warning(
-                "redlock_release_partial",
-                key=self._key,
-                nodes=released_count,
-                quorum=self._quorum,
-            )
-
-        self._acquired = False
+        token = self._token
         self._token = None
 
-        return success
+        await self._release_all(token)
+        logger.debug("redlock_released", key=self._key)
+        return True
 
-    async def _unlock_all_nodes(self, token: str) -> None:
-        """Unlock all nodes with the given token.
+    async def _release_all(self, token: str) -> None:
+        """Send unlock command to all Redis nodes in parallel.
 
         Args:
-            token: The lock token to release.
+            token: The unique token used during acquisition.
         """
-        import asyncio
-
-        # Release in parallel for speed
-        tasks = []
-        for client in self._clients:
-            tasks.append(
-                client.eval(
-                    self.RELEASE_SCRIPT,
-                    1,
-                    self._key,
-                    token,
-                )
-            )
-
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+        results = await asyncio.gather(  # type: ignore[no-matching-overload]
+            *[client.eval(RELEASE_SCRIPT, 1, self._key, token) for client in self._clients],
+            return_exceptions=True,
+        )
+        for r in results:
+            if isinstance(r, Exception):
+                logger.warning("redlock_node_release_failed", key=self._key)
 
     @property
     def acquired(self) -> bool:
         """Check if the lock is currently held."""
-        return self._acquired
+        return self._token is not None
 
     async def __aenter__(self) -> Redlock:
-        """Acquire the lock when entering the context.
-
-        Returns:
-            Self.
-        """
+        """Acquire the lock when entering the context."""
         await self.acquire()
         return self
 
     async def __aexit__(
         self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: Any,
+        _exc_type: type[BaseException] | None,
+        _exc_val: BaseException | None,
+        _exc_tb: object,
     ) -> None:
         """Release the lock when exiting the context."""
         await self.release()

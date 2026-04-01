@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any
+import contextlib
+import uuid
+from typing import TYPE_CHECKING
 
-import structlog
+from zrun_core.infra.logging import get_logger
+from zrun_core.lock.protocols import RELEASE_SCRIPT
 
 if TYPE_CHECKING:
     from redis.asyncio import Redis as AsyncRedis
 
-logger = structlog.get_logger()
+logger = get_logger()
 
 
 class SingleNodeLock:
@@ -27,15 +30,6 @@ class SingleNodeLock:
                 # Critical section
                 pass
         ```
-    """
-
-    # Lua script for safe lock release
-    RELEASE_SCRIPT = """
-    if redis.call("get", KEYS[1]) == ARGV[1] then
-        return redis.call("del", KEYS[1])
-    else
-        return 0
-    end
     """
 
     def __init__(
@@ -71,8 +65,6 @@ class SingleNodeLock:
         Returns:
             True if the lock was acquired, False otherwise.
         """
-        import uuid
-
         self._token = str(uuid.uuid4())
 
         result = await self._redis.set(
@@ -86,8 +78,6 @@ class SingleNodeLock:
 
         if self._acquired:
             logger.debug("lock_acquired", key=self._key, ttl=self._ttl)
-
-            # Start watchdog if auto-renewal is enabled
             if self._auto_renewal:
                 self._start_watchdog()
 
@@ -102,18 +92,14 @@ class SingleNodeLock:
         if self._token is None:
             return False
 
-        # Stop watchdog
         self._stop_watchdog.set()
         if self._watchdog_task is not None:
-            import contextlib
-
             with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(self._watchdog_task, timeout=1.0)
             self._watchdog_task = None
 
-        # Release using Lua script
         result = await self._redis.eval(  # type: ignore[no-any-await]
-            self.RELEASE_SCRIPT,
+            RELEASE_SCRIPT,
             1,
             self._key,
             self._token,
@@ -146,15 +132,11 @@ class SingleNodeLock:
                     self._stop_watchdog.wait(),
                     timeout=renewal_delay,
                 )
-
-                # Stop event was set
                 break
             except TimeoutError:
-                # Time to renew
                 if self._acquired and self._token:
                     renewed = await self._renew()
                     if not renewed:
-                        # Failed to renew, stop watching
                         logger.warning("lock_renewal_failed", key=self._key)
                         break
 
@@ -180,19 +162,15 @@ class SingleNodeLock:
         return self._acquired
 
     async def __aenter__(self) -> SingleNodeLock:
-        """Acquire the lock when entering the context.
-
-        Returns:
-            Self.
-        """
+        """Acquire the lock when entering the context."""
         await self.acquire()
         return self
 
     async def __aexit__(
         self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: Any,
+        _exc_type: type[BaseException] | None,
+        _exc_val: BaseException | None,
+        _exc_tb: object,
     ) -> None:
         """Release the lock when exiting the context."""
         await self.release()

@@ -118,24 +118,24 @@ class TestAuthInterceptor:
         token = interceptor._extract_token_from_metadata(None)
         assert token is None
 
-    def test_validate_token_valid_jwt(self, interceptor: AuthInterceptor) -> None:
-        """Test validating a valid JWT token."""
+    def test_decode_token_payload_valid_jwt(self, interceptor: AuthInterceptor) -> None:
+        """Test decoding a valid JWT payload."""
         token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTIzIn0.signature"
 
-        payload = interceptor._validate_token(token)
+        payload = interceptor._decode_token_payload(token)
         assert payload is not None
         assert payload.get("sub") == "user123"
 
-    def test_validate_token_invalid_format(self, interceptor: AuthInterceptor) -> None:
-        """Test validating an invalid token format."""
+    def test_decode_token_payload_invalid_format(self, interceptor: AuthInterceptor) -> None:
+        """Test decoding an invalid token format."""
         token = "invalid-token"
-        payload = interceptor._validate_token(token)
+        payload = interceptor._decode_token_payload(token)
         assert payload is None
 
-    def test_validate_token_missing_parts(self, interceptor: AuthInterceptor) -> None:
-        """Test validating token with missing parts."""
+    def test_decode_token_payload_missing_parts(self, interceptor: AuthInterceptor) -> None:
+        """Test decoding token with missing parts."""
         token = "only.two"
-        payload = interceptor._validate_token(token)
+        payload = interceptor._decode_token_payload(token)
         assert payload is None
 
     @pytest.mark.asyncio

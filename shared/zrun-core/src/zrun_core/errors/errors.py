@@ -53,6 +53,10 @@ class ConflictError(DomainError):
     """Raised when there's a conflict with existing state."""
 
 
+class BusinessError(DomainError):
+    """Raised when a business rule is violated (e.g., insufficient stock)."""
+
+
 class AuthenticationError(DomainError):
     """Raised when authentication fails."""
 
@@ -90,6 +94,8 @@ def map_error_to_grpc_status(error: Exception) -> grpc.StatusCode:
         return grpc.StatusCode.PERMISSION_DENIED
     if isinstance(error, RateLimitError):
         return grpc.StatusCode.RESOURCE_EXHAUSTED
+    if isinstance(error, BusinessError):
+        return grpc.StatusCode.FAILED_PRECONDITION
     if isinstance(error, DomainError):
         return grpc.StatusCode.FAILED_PRECONDITION
     if isinstance(error, grpc.RpcError):

@@ -5,6 +5,7 @@ from __future__ import annotations
 from zrun_core.errors.errors import (
     AuthenticationError,
     AuthorizationError,
+    BusinessError,
     ConflictError,
     DomainError,
     InternalError,
@@ -23,6 +24,7 @@ __all__ = [
     "ConflictError",
     "AuthenticationError",
     "AuthorizationError",
+    "BusinessError",
     "RateLimitError",
     "InternalError",
     # Error utilities
