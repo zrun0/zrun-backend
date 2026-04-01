@@ -13,6 +13,37 @@ if TYPE_CHECKING:
     from zrun_base.repository.protocols import SkuRepositoryProtocol
 
 
+def _normalize_code(code: str) -> str:
+    """Normalize SKU code by stripping whitespace and converting to uppercase.
+
+    Args:
+        code: The raw SKU code.
+
+    Returns:
+        The normalized code.
+    """
+    return code.strip().upper()
+
+
+def _validate_non_empty_string(value: str | None, field_name: str) -> str:
+    """Validate that a string is non-empty after stripping whitespace.
+
+    Args:
+        value: The string value to validate.
+        field_name: The name of the field for error messages.
+
+    Returns:
+        The stripped string value.
+
+    Raises:
+        ValidationError: If the value is empty or None.
+    """
+    if not value or not value.strip():
+        msg = f"{field_name} is required"
+        raise ValidationError(msg)
+    return value.strip()
+
+
 class SkuLogic:
     """Business logic for SKU operations.
 
@@ -41,36 +72,23 @@ class SkuLogic:
             ValidationError: If validation fails.
             ConflictError: If a SKU with the same code already exists.
         """
-        # Validate input
-        if not input.code or not input.code.strip():
-            msg = "Code is required"
-            raise ValidationError(msg)
+        code = _normalize_code(_validate_non_empty_string(input.code, "Code"))
+        name = _validate_non_empty_string(input.name, "Name")
 
-        if not input.name or not input.name.strip():
-            msg = "Name is required"
-            raise ValidationError(msg)
-
-        # Normalize code
-        code = input.code.strip().upper()
-
-        # Check for existing SKU with same code
         existing = await self._repo.get_by_code(code)
         if existing is not None:
             msg = f"SKU with code '{code}' already exists"
             raise ConflictError(msg)
 
-        # Create domain object
         sku = SkuDomain(
             id=str(uuid.uuid4()),
             code=code,
-            name=input.name.strip(),
+            name=name,
             created_at=datetime.now(UTC),
         )
 
-        # Validate
         sku.validate()
 
-        # Persist
         return await self._repo.create(sku)
 
     async def get_sku(self, sku_id: str) -> SkuDomain:
@@ -86,9 +104,7 @@ class SkuLogic:
             ValidationError: If the SKU ID is invalid.
             NotFoundError: If the SKU does not exist.
         """
-        if not sku_id or not sku_id.strip():
-            msg = "SKU ID is required"
-            raise ValidationError(msg)
+        _validate_non_empty_string(sku_id, "SKU ID")
 
         sku = await self._repo.get_by_id(sku_id)
         if sku is None:
@@ -111,37 +127,31 @@ class SkuLogic:
             NotFoundError: If the SKU does not exist.
             ConflictError: If the new code conflicts with another SKU.
         """
-        if not input.id or not input.id.strip():
-            msg = "SKU ID is required"
-            raise ValidationError(msg)
+        sku_id = _validate_non_empty_string(input.id, "SKU ID")
 
-        # Get existing SKU
-        existing = await self._repo.get_by_id(input.id)
+        existing = await self._repo.get_by_id(sku_id)
         if existing is None:
-            msg = f"SKU with ID '{input.id}' not found"
+            msg = f"SKU with ID '{sku_id}' not found"
             raise NotFoundError(msg)
 
-        # Prepare updates
         updates: dict[str, str] = {}
         if input.code is not None:
-            code = input.code.strip().upper()
+            code = _normalize_code(input.code)
             if code != existing.code:
-                # Check for conflict
                 other = await self._repo.get_by_code(code)
-                if other is not None and other.id != input.id:
+                if other is not None and other.id != sku_id:
                     msg = f"SKU with code '{code}' already exists"
                     raise ConflictError(msg)
                 updates["code"] = code
 
         if input.name is not None:
-            name = input.name.strip()
+            name = _validate_non_empty_string(input.name, "Name")
             if name:
                 updates["name"] = name
 
         if not updates:
             return existing
 
-        # Update domain object
         updated = SkuDomain(
             id=existing.id,
             code=updates.get("code", existing.code),
@@ -150,10 +160,8 @@ class SkuLogic:
             updated_at=datetime.now(UTC),
         )
 
-        # Validate
         updated.validate()
 
-        # Persist
         return await self._repo.update(updated)
 
     async def delete_sku(self, sku_id: str) -> None:
@@ -166,9 +174,7 @@ class SkuLogic:
             ValidationError: If the SKU ID is invalid.
             NotFoundError: If the SKU does not exist.
         """
-        if not sku_id or not sku_id.strip():
-            msg = "SKU ID is required"
-            raise ValidationError(msg)
+        _validate_non_empty_string(sku_id, "SKU ID")
 
         sku = await self._repo.get_by_id(sku_id)
         if sku is None:

@@ -44,7 +44,7 @@ class SkuRepository:
             sku: The SKU domain object to create.
 
         Returns:
-            The created SKU domain object.
+            The created SKU domain object with database defaults.
 
         Raises:
             ConflictError: If SKU code already exists.
@@ -61,7 +61,6 @@ class SkuRepository:
             msg = f"SKU with code '{sku.code}' already exists"
             raise ConflictError(msg) from e
 
-        # Flush ensures the model has database-generated defaults
         return model.to_domain()
 
     async def get_by_id(self, sku_id: str) -> SkuDomain | None:
@@ -79,10 +78,7 @@ class SkuRepository:
         result = await self._session.execute(stmt)
         model = result.scalar_one_or_none()
 
-        if model is None:
-            return None
-
-        return model.to_domain()
+        return model.to_domain() if model else None
 
     async def get_by_code(self, code: str) -> SkuDomain | None:
         """Get a SKU by code.
@@ -99,10 +95,7 @@ class SkuRepository:
         result = await self._session.execute(stmt)
         model = result.scalar_one_or_none()
 
-        if model is None:
-            return None
-
-        return model.to_domain()
+        return model.to_domain() if model else None
 
     async def update(self, sku: SkuDomain) -> SkuDomain:
         """Update an existing SKU.

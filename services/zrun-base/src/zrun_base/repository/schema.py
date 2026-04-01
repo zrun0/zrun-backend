@@ -8,10 +8,10 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine
 
 
-async def create_sku_table(engine: AsyncEngine) -> None:
-    """Create the skus table if it doesn't exist.
+async def create_tables(engine: AsyncEngine) -> None:
+    """Create all tables if they don't exist.
 
-    This function uses SQLAlchemy's metadata to create the table
+    This function uses SQLAlchemy's metadata to create tables
     with the correct schema for both PostgreSQL and SQLite.
 
     Args:

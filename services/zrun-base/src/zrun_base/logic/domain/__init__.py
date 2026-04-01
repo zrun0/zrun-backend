@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -9,6 +10,9 @@ from zrun_core.errors import ValidationError
 
 if TYPE_CHECKING:
     from datetime import datetime
+
+# Pre-compiled regex for SKU code validation: [A-Z0-9-]{3,50}
+_SKU_CODE_PATTERN = re.compile(r"^[A-Z0-9-]{3,50}$")
 
 
 @dataclass(frozen=True)
@@ -33,16 +37,12 @@ class SkuDomain:
         """
         errors = []
 
-        # Validate code format: [A-Z0-9-]{3,50}
-        if not self.code or len(self.code) < 3 or len(self.code) > 50:
-            errors.append("Code must be between 3 and 50 characters")
+        if not _SKU_CODE_PATTERN.match(self.code):
+            errors.append(
+                "Code must be between 3 and 50 characters and contain only "
+                "uppercase letters, numbers, and hyphens"
+            )
 
-        # Check for invalid characters
-        allowed_chars = set("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-")
-        if not all(c in allowed_chars for c in self.code):
-            errors.append("Code can only contain uppercase letters, numbers, and hyphens")
-
-        # Validate name
         if not self.name or len(self.name.strip()) == 0:
             errors.append("Name is required")
 

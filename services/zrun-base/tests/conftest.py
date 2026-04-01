@@ -14,7 +14,7 @@ from zrun_base.config import BaseServiceConfig
 from zrun_base.logic.domain import CreateSkuInput, SkuDomain
 from zrun_base.logic.sku import SkuLogic
 from zrun_base.repository.repos import SkuRepository
-from zrun_base.repository.schema import create_sku_table
+from zrun_base.repository.schema import create_tables
 from zrun_base.servicers.sku_servicer import SkuServicer
 from zrun_core import USER_ID_CTX_KEY, get_async_session
 
@@ -41,7 +41,7 @@ async def test_engine() -> AsyncGenerator[AsyncEngine]:
     )
 
     # Create schema
-    await create_sku_table(engine)
+    await create_tables(engine)
 
     try:
         yield engine

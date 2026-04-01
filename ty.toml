@@ -38,7 +38,7 @@ root = ["services", "shared"]
 # === Permissive Layer: Servicers ===
 # Allow unknown types for external API handling
 [[overrides]]
-include = ["services/*/src/servicers/**"]
+include = ["services/*/src/*/servicers/**"]
 
 [overrides.rules]
 possibly-missing-import = "ignore"

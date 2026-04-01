@@ -81,5 +81,5 @@ class SkuModel(Base, TimestampMixin):
             code=sku.code,
             name=sku.name,
             created_at=sku.created_at,
-            updated_at=sku.updated_at,
+            # updated_at is managed by TimestampMixin, not passed from domain
         )

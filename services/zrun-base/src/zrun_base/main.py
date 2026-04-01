@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from zrun_base.config import DatabaseBackend, get_base_config
 from zrun_base.logic.sku import SkuLogic
 from zrun_base.repository.repos import SkuRepository
-from zrun_base.repository.schema import create_sku_table
+from zrun_base.repository.schema import create_tables
 from zrun_base.servicers.sku_servicer import SkuServicer
 from zrun_core import create_async_engine, get_async_session, run_service
 
@@ -65,7 +65,7 @@ async def main() -> int:
         max_overflow=config.database_max_overflow,
     )
 
-    await create_sku_table(engine)
+    await create_tables(engine)
 
     # Create servicers
     async with get_async_session(engine) as session:
