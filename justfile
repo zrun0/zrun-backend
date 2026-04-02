@@ -68,8 +68,14 @@ proto:
 
 # Lint proto files
 proto-lint:
-    @echo "==> Linting proto files..."
-    buf lint
+    #!/usr/bin/env bash
+    if command -v buf &> /dev/null; then
+        echo "==> Linting proto files..."
+        buf lint
+    else
+        echo "==> Skipping proto lint (buf not installed)"
+        echo "    Install buf: https://buf.build/docs/installation"
+    fi
 
 # Format proto files
 proto-format:
@@ -78,12 +84,21 @@ proto-format:
 
 # Check proto format without changes
 proto-format-check:
-    @echo "==> Checking proto format..."
-    buf format --diff
+    #!/usr/bin/env bash
+    if command -v buf &> /dev/null; then
+        echo "==> Checking proto format..."
+        buf format --diff
+    else
+        echo "==> Skipping proto format check (buf not installed)"
+    fi
 
 # Check for breaking changes against main branch
 proto-breaking:
     #!/usr/bin/env bash
+    if ! command -v buf &> /dev/null; then
+        echo "==> Skipping breaking change check (buf not installed)"
+        exit 0
+    fi
     if [ -d .git ]; then
         echo "==> Checking for breaking changes..."
         buf breaking --against '.git#branch=main'

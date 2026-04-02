@@ -22,7 +22,22 @@ exclude = [
 [environment]
 python-version = "3.14"
 python-platform = "linux"
-root = ["services", "shared"]
+# Add workspace package src directories for module resolution
+# Only include packages that have src directories
+extra-paths = [
+    "shared/zrun-core/src",
+    "shared/zrun-schema/src",
+    "services/zrun-base/src",
+    "services/zrun-bff/src",
+]
+
+# =============================================================================
+# ANALYSIS SETTINGS
+# =============================================================================
+# Allow unresolved imports for generated protobuf files (require `just proto`)
+
+[analysis]
+allowed-unresolved-imports = ["zrun_schema.generated.**"]
 
 # =============================================================================
 # LAYERED TYPE SAFETY OVERRIDES

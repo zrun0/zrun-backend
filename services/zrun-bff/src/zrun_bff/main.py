@@ -35,7 +35,8 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
     config = get_config()
     # Fail fast if JWT private key is configured but not found
     if config.jwt_private_key_path:
-        _ = config.jwt_private_key
+        # Access the property to trigger validation (may raise FileNotFoundError)
+        _key = config.jwt_private_key  # noqa: F841
     logger.info(
         "bff_starting",
         service="zrun-bff",
@@ -67,7 +68,7 @@ def create_app(config: BFFConfig | None = None) -> FastAPI:
 
     # CORS middleware
     app.add_middleware(
-        CORSMiddleware,
+        CORSMiddleware,  # ty: ignore[invalid-argument-type]
         allow_origins=config.cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
