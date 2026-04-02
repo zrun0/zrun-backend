@@ -84,6 +84,7 @@ override-dependencies = [
     "python-jose==3.3.0",
     "python-dateutil==2.9.0.post0",
     "cachetools==7.0.5",
+    "sentry-sdk==2.19.2",
 
     # ─────────────────────────────────────────────────────────────
     # Testing (Dev Dependencies)

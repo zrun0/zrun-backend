@@ -8,6 +8,7 @@ Modules:
 - domain: Domain error hierarchy with gRPC status mapping
 - grpc: gRPC server with lifecycle management and health checks
 - lock: Distributed lock with single-node and Redlock support
+- observability: Sentry integration for error tracking and performance monitoring
 """
 
 from __future__ import annotations
@@ -74,6 +75,17 @@ from zrun_core.lock import (
     redis_lock,
 )
 
+# =============================================================================
+# Observability
+# =============================================================================
+from zrun_core.observability import (
+    SENTRY_DSN_ENV_KEY,
+    SENTRY_ENVIRONMENT_ENV_KEY,
+    SENTRY_TRACES_SAMPLE_RATE_ENV_KEY,
+    configure_sentry_from_env,
+    init_sentry,
+)
+
 __all__ = [
     # =========================================================================
     # Infrastructure
@@ -133,4 +145,12 @@ __all__ = [
     "LockAcquisitionError",
     "LockReleaseError",
     "LockRenewalError",
+    # =========================================================================
+    # Observability
+    # =========================================================================
+    "init_sentry",
+    "configure_sentry_from_env",
+    "SENTRY_DSN_ENV_KEY",
+    "SENTRY_ENVIRONMENT_ENV_KEY",
+    "SENTRY_TRACES_SAMPLE_RATE_ENV_KEY",
 ]

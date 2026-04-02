@@ -6,9 +6,9 @@ Backend For Frontend (BFF) service for zrun WMS.
 
 ```
 ┌─────────┐      ┌─────────┐      ┌─────────┐      ┌──────────────┐
-│  PDA   │ ───> │   BFF   │ ───> │ Casdoor │      │  Internal    │
+│  PDA    │ ───> │   BFF   │ ───> │ Casdoor │      │  Internal    │
 │   Web   │ ───> │(FastAPI)│ ───> │(OAuth2) │ ───> │  Services    │
-│ MiniApp│ ───> │         │      └─────────┘      │(gRPC)        │
+│ MiniApp │ ───> │         │      └─────────┘      │(gRPC)        │
 └─────────┘      └─────────┘                       └──────────────┘
                       │
                       ├── OAuth2 Authentication
