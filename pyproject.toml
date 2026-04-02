@@ -130,3 +130,20 @@ dev = [
     "pytest-cov",
     "pyright"       # For claude code lsp
 ]
+
+# =============================================================================
+# RUFF (Linter & Formatter)
+# =============================================================================
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "B008",  # FastAPI Depends() in defaults is standard pattern
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["zrun_core", "zrun_schema", "zrun_bff"]

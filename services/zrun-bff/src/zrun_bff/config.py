@@ -7,6 +7,7 @@ from pathlib import Path
 from pydantic_settings import SettingsConfigDict
 
 from zrun_core.infra import ServiceConfig
+from zrun_bff.secrets import get_key, KeyProviderConfig
 
 
 class BFFConfig(ServiceConfig):
@@ -42,6 +43,8 @@ class BFFConfig(ServiceConfig):
 
     # JWT Signing Configuration
     jwt_private_key_path: str = ""
+    jwt_key_id: str = "key-1"  # JWKS key ID for rotation support
+    jwt_key_version: str = "v1"  # Key version for rotation tracking
     jwt_issuer: str = "zrun-bff"
     jwt_audience: str = "zrun-services"
     jwt_expiration_seconds: int = 3600

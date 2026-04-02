@@ -27,6 +27,15 @@ dev = [
     "httpx",
 ]
 
+# Optional dependencies for different key providers
+[project.optional-dependencies]
+vault = [
+    "hvac>=2.0.0",
+]
+k8s = [
+    "kubernetes>=28.0.0",
+]
+
 [tool.uv.sources]
 zrun-core = { workspace = true }
 zrun-schema = { workspace = true }
@@ -37,3 +46,32 @@ packages = ["src/zrun_bff"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "ANN401",  # Dynamically typed expressions (Any is sometimes necessary)
+    "B008",  # FastAPI Depends() in defaults is standard pattern
+    "COM812",  # Trailing comma missing (conflicts with formatter)
+    "D104",  # Missing docstring in public package
+    "D413",  # Missing blank line after last section (Google style doesn't require it)
+    "D401",  # First line of docstring imperative mood
+    "I001",  # Import block un-sorted (format handles this)
+    "PLR0913",  # Too many arguments in function definition
+    "PLC0415",  # Import at top-level (conditional imports are OK)
+    "RUF012",  # Mutable default value (pydantic handles this)
+    "RUF022",  # __all__ is not sorted (not critical)
+    "RUF100",  # Unused noqa directive
+    "S105",  # Possible hardcoded password (these are URLs, not passwords)
+    "S104",  # Possible binding to all interfaces (containerized service)
+    "SLF001",  # Private member accessed (necessary for jose library)
+    "TRY300",  # Consider moving to else block
+    "TRY400",  # Use logging.exception instead of error (structlog doesn't have exception)
+    "TD002",  # Missing author in TODO
+    "TD003",  # Missing issue link for TODO
+    "FIX002",  # Line contains TODO
+]

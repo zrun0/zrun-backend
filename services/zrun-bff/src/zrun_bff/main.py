@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 from structlog import get_logger
 
+from zrun_bff.auth.router import router as auth_router
 from zrun_bff.config import BFFConfig
 
 if TYPE_CHECKING:
@@ -85,9 +86,10 @@ def create_app(config: BFFConfig | None = None) -> FastAPI:
         """
         return {"status": "healthy", "service": "zrun-bff"}
 
-    # TODO: Register routers
-    # - OAuth2 routes (/auth/login, /auth/callback)
-    # - JWKS endpoint (/.well-known/jwks.json)
+    # Register routers
+    app.include_router(auth_router, tags=["Authentication"])
+
+    # TODO: Register additional routers
     # - PDA routes (/api/pda/*)
     # - Web admin routes (/api/web/*)
     # - Mini app routes (/api/mini/*)

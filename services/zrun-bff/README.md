@@ -4,18 +4,65 @@ Backend For Frontend (BFF) service for zrun WMS.
 
 ## Architecture
 
+```mermaid
+graph TB
+    subgraph Clients["Client Layer"]
+        PDA["PDA"]
+        WEB["Web"]
+        MINI["MiniApp"]
+    end
+
+    subgraph BFF["BFF Service Layer"]
+        BFFSvc["zrun-bff<br/>(FastAPI)"]
+        AUTH["OAuth2 Authentication"]
+        JWT["JWT Issuance"]
+        AGG["API Aggregation"]
+        TRANS["Protocol Translation<br/>HTTP → gRPC"]
+    end
+
+    subgraph External["External Services"]
+        CASDOOR["Casdoor<br/>(OAuth2)"]
+    end
+
+    subgraph Internal["Internal Services"]
+        BASE["zrun-base"]
+        STOCK["zrun-stock"]
+        OPS["zrun-ops"]
+        INTEG["zrun-integration"]
+    end
+
+    PDA --> BFFSvc
+    WEB --> BFFSvc
+    MINI --> BFFSvc
+
+    BFFSvc --> AUTH
+    AUTH --> CASDOOR
+
+    BFFSvc --> JWT
+    BFFSvc --> AGG
+    BFFSvc --> TRANS
+
+    TRANS --> BASE
+    TRANS --> STOCK
+    TRANS --> OPS
+    TRANS --> INTEG
+
+    style BFF fill:#4a90d9
+    style CASDOOR fill:#f5a623
+    style BASE fill:#50c878
+    style STOCK fill:#50c878
+    style OPS fill:#50c878
+    style INTEG fill:#50c878
 ```
-┌─────────┐      ┌─────────┐      ┌─────────┐      ┌──────────────┐
-│  PDA    │ ───> │   BFF   │ ───> │ Casdoor │      │  Internal    │
-│   Web   │ ───> │(FastAPI)│ ───> │(OAuth2) │ ───> │  Services    │
-│ MiniApp │ ───> │         │      └─────────┘      │(gRPC)        │
-└─────────┘      └─────────┘                       └──────────────┘
-                      │
-                      ├── OAuth2 Authentication
-                      ├── JWT Re-issuance (Internal tokens)
-                      ├── API Aggregation
-                      └── Protocol Translation (HTTP → gRPC)
-```
+
+**Core Responsibilities:**
+
+| Responsibility | Description |
+|:---------------|:------------|
+| OAuth2 Authentication | Integrate with Casdoor for login flow |
+| JWT Re-issuance | Issue internal JWT tokens for microservices |
+| API Aggregation | Aggregate data from multiple internal services |
+| Protocol Translation | Convert HTTP → gRPC protocol |
 
 ## Responsibilities
 
