@@ -1,9 +1,11 @@
 """FastAPI application entry point for zrun-bff service."""
 
 from contextlib import asynccontextmanager
+from functools import lru_cache
 from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
+from starlette.middleware.cors import CORSMiddleware
 from structlog import get_logger
 
 from zrun_bff.config import BFFConfig
@@ -14,19 +16,14 @@ if TYPE_CHECKING:
 logger = get_logger()
 
 
+@lru_cache
 def get_config() -> BFFConfig:
     """Get cached BFF configuration.
 
     Returns:
         BFF configuration instance.
     """
-    from functools import lru_cache
-
-    @lru_cache
-    def _get_config() -> BFFConfig:
-        return BFFConfig()
-
-    return _get_config()
+    return BFFConfig()
 
 
 @asynccontextmanager
@@ -36,6 +33,9 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
     Handles startup and shutdown events.
     """
     config = get_config()
+    # Fail fast if JWT private key is configured but not found
+    if config.jwt_private_key_path:
+        _ = config.jwt_private_key
     logger.info(
         "bff_starting",
         service="zrun-bff",
@@ -66,10 +66,8 @@ def create_app(config: BFFConfig | None = None) -> FastAPI:
     )
 
     # CORS middleware
-    from fastapi.middleware.cors import CORSMiddleware
-
-    CORSMiddleware(  # Workaround for ty type checker issue
-        app,
+    app.add_middleware(
+        CORSMiddleware,
         allow_origins=config.cors_origins,
         allow_credentials=True,
         allow_methods=["*"],

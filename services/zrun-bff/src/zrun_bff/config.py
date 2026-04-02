@@ -17,7 +17,7 @@ class BFFConfig(ServiceConfig):
     Environment variables:
         CASDOOR_CLIENT_ID: Casdoor OAuth2 client ID
         CASDOOR_CLIENT_SECRET: Casdoor OAuth2 client secret
-        CASDOREDIRECT_URI: OAuth2 callback URL
+        CASDOOR_REDIRECT_URI: OAuth2 callback URL
         CASDOOR_AUTHORIZATION_ENDPOINT: Casdoor authorize URL
         CASDOOR_TOKEN_ENDPOINT: Casdoor token endpoint
         JWT_PRIVATE_KEY_PATH: Path to JWT signing private key
