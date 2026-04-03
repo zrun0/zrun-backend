@@ -157,3 +157,6 @@ shared/zrun-schema/src/zrun_schema/generated/
 *~
 .DS_Store
 .dmux/
+
+# Serena
+.serena/
