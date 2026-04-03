@@ -6,10 +6,8 @@ from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
-from structlog import get_logger
-
 from zrun_bff.api.pda.sku import router as sku_router
-from zrun_bff.auth.middleware import UserContextMiddleware
+from zrun_bff.auth.middleware import SessionMiddleware, UserContextMiddleware
 from zrun_bff.auth.router import router as auth_router
 from zrun_bff.config import BFFConfig, get_config
 from zrun_bff.errors import (
@@ -17,7 +15,7 @@ from zrun_bff.errors import (
     ErrorResponse,
     grpc_error_to_bff_error,
 )
-from zrun_bff.auth.middleware import SessionMiddleware
+from zrun_core.infra.logging import configure_structlog, get_logger
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -32,6 +30,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     Handles startup and shutdown events.
     """
     config = get_config()
+
+    # Configure structlog
+    configure_structlog(
+        service_name="zrun-bff",
+        log_level=config.log_level,
+        log_format="json" if config.env == "prod" else "console",
+    )
+
     # Fail fast if JWT private key is configured but not found
     if config.jwt_private_key_path:
         # Access the property to trigger validation (may raise FileNotFoundError)
