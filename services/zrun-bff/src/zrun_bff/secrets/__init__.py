@@ -20,10 +20,11 @@ Environment Variables:
 from __future__ import annotations
 
 import os
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Literal
+from functools import cache
+from typing import Any, Literal
 
 import structlog
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -86,6 +87,7 @@ class EnvKeyProvider(KeyProvider):
     """
 
     def __init__(self) -> None:
+        """Initialize environment provider."""
         self._prefix_map: dict[str, str] = {
             "jwt_private_key": "JWT_PRIVATE_KEY",
             "casdoor_client_secret": "CASDOOR_CLIENT_SECRET",
@@ -110,6 +112,7 @@ class EnvKeyProvider(KeyProvider):
 
     @property
     def provider_name(self) -> str:
+        """Get provider name."""
         return "env"
 
 
@@ -121,6 +124,7 @@ class FileKeyProvider(KeyProvider):
     """
 
     def __init__(self, base_path: str = "/etc/secrets") -> None:
+        """Initialize file provider with base path."""
         self._base_path = base_path
         self._key_map: dict[str, str] = {
             "jwt_private_key": "jwt_private_key.pem",
@@ -151,6 +155,7 @@ class FileKeyProvider(KeyProvider):
 
     @property
     def provider_name(self) -> str:
+        """Get provider name."""
         return "file"
 
 
@@ -162,6 +167,7 @@ class K8sSecretProvider(KeyProvider):
     """
 
     def __init__(self) -> None:
+        """Initialize K8s provider."""
         self._client: Any | None = None
         self._namespace: str = os.getenv("POD_NAMESPACE", "default")
 
@@ -174,7 +180,7 @@ class K8sSecretProvider(KeyProvider):
                 # Try in-cluster config first, then fallback to kubeconfig
                 try:
                     config.load_incluster_config()
-                except config.ConfigException:  # type: ignore[attr-defined]
+                except config.ConfigException:
                     config.load_kube_config()
 
                 self._client = client.CoreV1Api()
@@ -217,11 +223,12 @@ class K8sSecretProvider(KeyProvider):
         try:
             self._get_client()
             return True
-        except Exception:
+        except ImportError, RuntimeError, OSError:
             return False
 
     @property
     def provider_name(self) -> str:
+        """Get provider name."""
         return "k8s"
 
 
@@ -245,6 +252,14 @@ class VaultKeyProvider(KeyProvider):
         namespace: str | None = None,
         path_prefix: str = "secret/zrun",
     ) -> None:
+        """Initialize Vault provider.
+
+        Args:
+            address: Vault server address. Defaults to VAULT_ADDR env var.
+            role: Kubernetes authentication role. Defaults to VAULT_ROLE env var.
+            namespace: Vault namespace for Enterprise. Defaults to VAULT_NAMESPACE env var.
+            path_prefix: Prefix for secrets. Defaults to "secret/zrun".
+        """
         self._address = address or os.getenv("VAULT_ADDR")
         self._role = role or os.getenv("VAULT_ROLE")
         self._namespace = namespace or os.getenv("VAULT_NAMESPACE")
@@ -268,7 +283,7 @@ class VaultKeyProvider(KeyProvider):
             self._client = None
 
         try:
-            import hvac
+            import hvac  # type: ignore[import-untyped]
 
             client = hvac.Client(
                 url=self._address,
@@ -277,8 +292,9 @@ class VaultKeyProvider(KeyProvider):
 
             # Kubernetes authentication
             jwt_path = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-            with open(jwt_path) as f:
-                jwt_token = f.read()
+            from pathlib import Path
+
+            jwt_token = Path(jwt_path).read_text()
 
             client.auth.kubernetes.login(
                 role=self._role or "bff-service",
@@ -323,15 +339,13 @@ class VaultKeyProvider(KeyProvider):
             # Try to read a non-critical path
             client.secrets.kv.v2.read_secret_version(path=f"{self._path_prefix}/health")
             return True
-        except Exception:
+        except ImportError, RuntimeError, OSError:
             return False
 
     @property
     def provider_name(self) -> str:
+        """Get provider name."""
         return "vault"
-
-
-import time
 
 
 class KeyProviderConfig(BaseSettings):
@@ -363,12 +377,12 @@ class KeyProviderConfig(BaseSettings):
     secrets_path: str = "/etc/secrets"
 
 
-@lru_cache(maxsize=None)
-def _get_key_provider_cached(config_hash: int) -> KeyProvider:
+@cache
+def _get_key_provider_cached(_config_hash: int) -> KeyProvider:
     """Cached key provider getter (hash-based to avoid unhashable config).
 
     Args:
-        config_hash: Hash of the config object for cache key.
+        _config_hash: Hash of the config object for cache key.
 
     Returns:
         A KeyProvider instance.
@@ -401,7 +415,9 @@ def _create_provider(config: KeyProviderConfig) -> KeyProvider:
         )
 
         # Add K8s provider if in cluster
-        if os.path.exists("/var/run/secrets/kubernetes.io/serviceaccount/token"):
+        from pathlib import Path
+
+        if Path("/var/run/secrets/kubernetes.io/serviceaccount/token").exists():
             providers.append(K8sSecretProvider())
 
         # Add Vault if configured
@@ -436,7 +452,7 @@ def _create_provider(config: KeyProviderConfig) -> KeyProvider:
                     selected_from=provider_type,
                 )
                 return provider
-        except Exception as e:
+        except (ImportError, RuntimeError, OSError, KeyError) as e:
             logger.warning(
                 "key_provider_unavailable",
                 provider=provider.provider_name,

@@ -52,6 +52,37 @@ select = [
     "ARG",    # flake8-unused-arguments
     "PTH",    # flake8-use-pathlib
     "ERA",    # eradicate
+    "S",      # flake8-bandit (security)
+    "ANN",    # flake8-annotations
+    "PLR",    # pylint refactor
+]
+
+# Global ignores (truly project-wide exceptions)
+extend-ignore = [
+    # Architecture/pattern allows
+    "S104",    # Binding to all interfaces (0.0.0.0 is standard for containers)
+    "ANN401",  # Any type (acceptable in certain contexts)
+    "B008",    # FastAPI Depends() in defaults is standard pattern
+    "PLR0911", # Too many return statements (error mapping needs many returns)
+    "PLR0913", # Too many arguments (JWT generation needs many params)
+    # BFF-specific (FastAPI/jose/pydantic)
+    "COM812",  # Trailing comma missing (conflicts with formatter)
+    "D104",    # Missing docstring in public package
+    "D401",    # First line of docstring imperative mood
+    "D413",    # Missing blank line after last section (Google style doesn't require it)
+    "I001",    # Import block un-sorted (format handles this)
+    "PLC0415", # Import at top-level (conditional imports are OK)
+    "RUF012",  # Mutable default value (pydantic handles this)
+    "RUF022",  # __all__ is not sorted (not critical)
+    "RUF100",  # Unused noqa directive
+    "SLF001",  # Private member accessed (necessary for jose library)
+    # Error handling / documentation style
+    "TRY300",  # Consider moving to else block
+    "TRY400",  # Use logging.exception instead of error (structlog doesn't have exception)
+    "TD002",   # Missing author in TODO
+    "TD003",   # Missing issue link for TODO
+    "FIX002",  # Line contains TODO
+    "ANN202",  # Missing return type private function
 ]
 
 # =============================================================================
@@ -61,7 +92,18 @@ select = [
 [lint.per-file-ignores]
 "**/generated/*.py" = ["ALL"]
 "__init__.py" = ["F401"]
-"**/tests/**/*.py" = ["ARG001", "TCH002", "TCH003"]
+# Test files - ignore pytest-specific rules
+"**/tests/**/*.py" = [
+    "S101",    # Use of assert (pytest standard)
+    "S105",    # Hardcoded password string (test secrets)
+    "S106",    # Hardcoded password (test secrets)
+    "ANN001",  # Missing type annotation for function argument (test args)
+    "ANN201",  # Missing return type annotation (test functions)
+    "PLR2004", # Magic value used in comparison
+    "ARG001",  # Unused function argument (pytest fixtures)
+    "TCH002",  # Type-checking imports in tests
+    "TCH003",  # Type-checking imports in tests
+]
 "**/*_servicer.py" = ["N802"]
 "**/api/*.py" = ["TC002"]
 

@@ -7,7 +7,6 @@ from pathlib import Path
 from pydantic_settings import SettingsConfigDict
 
 from zrun_core.infra import ServiceConfig
-from zrun_bff.secrets import get_key, KeyProviderConfig
 
 
 class BFFConfig(ServiceConfig):

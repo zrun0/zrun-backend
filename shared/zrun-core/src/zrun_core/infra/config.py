@@ -5,6 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -85,9 +86,22 @@ class ServiceConfig(BaseSettings):
         return self.env == "dev"
 
     @property
+    def is_staging(self) -> bool:
+        """Check if running in staging."""
+        return self.env == "staging"
+
+    @property
     def database_pool_min_size(self) -> int:
         """Minimum database pool size."""
         return max(1, self.database_pool_size // 2)
+
+    @model_validator(mode="after")
+    def validate_redlock_config(self) -> ServiceConfig:
+        """Validate redlock mode requires lock_redis_urls."""
+        if self.lock_mode == "redlock" and not self.lock_redis_urls:
+            msg = "lock_redis_urls must contain at least one URL"
+            raise ValueError(msg)
+        return self
 
 
 @lru_cache
