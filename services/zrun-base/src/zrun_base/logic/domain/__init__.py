@@ -13,6 +13,8 @@ if TYPE_CHECKING:
 
 # Pre-compiled regex for SKU code validation: [A-Z0-9-]{3,50}
 _SKU_CODE_PATTERN = re.compile(r"^[A-Z0-9-]{3,50}$")
+# Maximum name length constant
+_MAX_NAME_LENGTH = 200
 
 
 @dataclass(frozen=True)
@@ -46,8 +48,8 @@ class SkuDomain:
         if not self.name or len(self.name.strip()) == 0:
             errors.append("Name is required")
 
-        if len(self.name) > 200:
-            errors.append("Name must not exceed 200 characters")
+        if len(self.name) > _MAX_NAME_LENGTH:
+            errors.append(f"Name must not exceed {_MAX_NAME_LENGTH} characters")
 
         if errors:
             raise ValidationError("; ".join(errors))

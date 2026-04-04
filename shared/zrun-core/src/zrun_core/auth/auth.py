@@ -11,13 +11,15 @@ import contextvars
 from typing import TYPE_CHECKING, Any, cast
 
 import grpc
-import httpx
 import structlog
-from cachetools import TTLCache
 from grpc.aio import ServerInterceptor
 
 if TYPE_CHECKING:
+    from .protocols import JWKSProviderProtocol
     from collections.abc import Callable, Iterable
+
+from .jwks import JWKSProvider, JWKSProviderConfig
+from .verification import JWTVerificationConfig, JWTVerificationError, verify_jwt_with_jwks
 
 USER_ID_CTX_KEY: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "user_id",
@@ -55,14 +57,6 @@ def _decode_metadata_key(key: bytes | str) -> str:
     return key
 
 
-class JWKSFetchError(Exception):
-    """Error fetching JWKS from the identity provider."""
-
-    def __init__(self, message: str) -> None:
-        self.message = message
-        super().__init__(message)
-
-
 class AuthInterceptor(ServerInterceptor):
     """gRPC interceptor for JWT authentication.
 
@@ -75,64 +69,76 @@ class AuthInterceptor(ServerInterceptor):
     - Proper JWT signature verification
     - Claims validation (exp, nbf, aud, iss)
     - Request abortion on authentication failure
+    - Dependency injection support for testing
 
     Architecture Pattern B:
         Frontend → BFF (OAuth2 with Casdoor) → Internal JWT
         Internal Services → Validate BFF JWT (using BFF JWKS)
+
+    Example:
+        ```python
+        # With default JWKS provider
+        interceptor = AuthInterceptor(
+            jwks_url="https://bff.example.com/.well-known/jwks.json",
+            audience="zrun-services",
+            issuer="zrun-bff",
+        )
+
+        # With custom JWKS provider (for testing)
+        mock_provider = MockJWKSProvider()
+        interceptor = AuthInterceptor(
+            jwks_provider=mock_provider,
+            audience="zrun-services",
+            issuer="zrun-bff",
+        )
+        ```
     """
 
     def __init__(
         self,
-        jwks_url: str,
-        audience: str,
+        jwks_url: str | None = None,
+        audience: str = "",
         issuer: str | None = None,
         cache_ttl: int = 300,
+        jwks_provider: JWKSProviderProtocol | None = None,
     ) -> None:
         """Initialize the authentication interceptor.
 
         Args:
             jwks_url: URL to fetch JWKS from (BFF endpoint, not Casdoor).
+                     Required if jwks_provider is not provided.
             audience: Expected JWT audience claim (e.g., "zrun-services").
             issuer: Expected JWT issuer claim (e.g., "zrun-bff").
-            cache_ttl: Cache TTL for JWKS in seconds.
-        """
-        self._jwks_url = jwks_url
-        self._audience = audience
-        self._issuer = issuer
-        self._cache: TTLCache[str, dict[str, Any]] = TTLCache(maxsize=10, ttl=cache_ttl)
-        self._client = httpx.AsyncClient(timeout=10.0)
-
-    async def _fetch_jwks(self) -> dict[str, Any]:
-        """Fetch JWKS from the BFF service.
-
-        Returns:
-            JWKS as a dictionary.
+            cache_ttl: Cache TTL for JWKS in seconds. Only used if jwks_provider is not provided.
+            jwks_provider: Optional JWKS provider for dependency injection.
+                          If provided, jwks_url and cache_ttl are ignored.
 
         Raises:
-            JWKSFetchError: If fetching JWKS fails.
+            ValueError: If neither jwks_url nor jwks_provider is provided.
         """
-        try:
-            response = await self._client.get(self._jwks_url)
-            response.raise_for_status()
-            return response.json()
-        except httpx.HTTPError as e:
-            msg = f"Failed to fetch JWKS: {e}"
-            raise JWKSFetchError(msg) from e
+        if jwks_provider is None:
+            if not jwks_url:
+                msg = "Either jwks_url or jwks_provider must be provided"
+                raise ValueError(msg)
+            # Create JWKS provider
+            jwks_config = JWKSProviderConfig(
+                jwks_url=jwks_url,
+                cache_ttl_seconds=cache_ttl,
+                timeout_seconds=10,
+            )
+            self._jwks_provider = JWKSProvider(config=jwks_config)
+            self._owned_provider = True
+        else:
+            self._jwks_provider = jwks_provider
+            self._owned_provider = False
 
-    async def _get_jwks(self) -> dict[str, Any]:
-        """Get JWKS from cache or fetch fresh.
-
-        Returns:
-            JWKS as a dictionary.
-        """
-        cache_key = "jwks"
-
-        if cache_key in self._cache:
-            return self._cache[cache_key]
-
-        jwks = await self._fetch_jwks()
-        self._cache[cache_key] = jwks
-        return jwks
+        # Create JWT verification config
+        self._jwt_config = JWTVerificationConfig(
+            audience=audience,
+            issuer=issuer or "",
+            algorithms=["RS256"],
+            require_sub=True,
+        )
 
     def _extract_token(self, metadata: Any) -> str | None:
         """Extract JWT token from gRPC metadata.
@@ -173,58 +179,16 @@ class AuthInterceptor(ServerInterceptor):
         Returns:
             Token payload if valid, None if validation fails.
         """
-        from jose import JWTError, jwt
-        from jose.exceptions import ExpiredSignatureError
-
         try:
-            # Get JWKS from BFF
-            jwks = await self._get_jwks()
-
-            # Get JWT header to find key ID
-            header = jwt.get_unverified_header(token)
-            kid = header.get("kid")
-
-            if not kid:
-                logger.error("auth_failed_no_kid")
-                return None
-
-            # Find matching key in JWKS
-            rsa_key: dict[str, Any] | None = None
-            for key in jwks.get("keys", []):
-                if key.get("kid") == kid:
-                    rsa_key = {
-                        "kty": key["kty"],
-                        "kid": key["kid"],
-                        "use": key.get("use", "sig"),
-                        "n": key["n"],
-                        "e": key["e"],
-                    }
-                    break
-
-            if not rsa_key:
-                logger.error("auth_failed_no_key", kid=kid)
-                return None
-
-            # Verify and decode token with full validation
-            payload = jwt.decode(
-                token,
-                rsa_key,
-                algorithms=["RS256"],
-                audience=self._audience,
-                issuer=self._issuer,
+            payload = await verify_jwt_with_jwks(
+                token=token,
+                jwks_provider=self._jwks_provider,
+                config=self._jwt_config,
             )
-
             logger.debug("auth_success", user_id=payload.get("sub"))
             return payload
-
-        except ExpiredSignatureError:
-            logger.warning("auth_failed_token_expired")
-            return None
-        except JWTError as e:
-            logger.warning("auth_failed_jwt_error", error=str(e))
-            return None
-        except Exception as e:
-            logger.error("auth_failed_unexpected", error=str(e))
+        except JWTVerificationError:
+            logger.warning("auth_failed_verification")
             return None
 
     async def intercept_service(
@@ -289,11 +253,13 @@ class AuthInterceptor(ServerInterceptor):
             USER_ID_CTX_KEY.reset(token_var)
 
     async def close(self) -> None:
-        """Close the HTTP client.
+        """Close the JWKS provider.
 
         Should be called when shutting down the service.
+        Only closes the provider if we own it (i.e., it was created by this interceptor).
         """
-        await self._client.aclose()
+        if self._owned_provider:
+            await self._jwks_provider.close()
 
     async def __aenter__(self) -> AuthInterceptor:
         """Async context manager entry."""

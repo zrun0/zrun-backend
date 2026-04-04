@@ -15,6 +15,8 @@ dependencies = [
     "httpx",
     "python-jose[cryptography]",
     "python-multipart",
+    "itsdangerous",
+    "grpcio",
 ]
 
 [project.scripts]

@@ -12,6 +12,9 @@ if TYPE_CHECKING:
 
     from zrun_core.lock.protocols import DistributedLock
 
+# Minimum Redis clients required for Redlock algorithm
+_REDLOCK_MIN_CLIENTS = 3
+
 
 def create_lock(
     key: str,
@@ -70,8 +73,8 @@ def create_lock(
         if redis_clients is None:
             msg = "redis_clients is required for 'redlock' mode"
             raise ValueError(msg)
-        if len(redis_clients) < 3:
-            msg = "redlock requires at least 3 Redis clients"
+        if len(redis_clients) < _REDLOCK_MIN_CLIENTS:
+            msg = f"redlock requires at least {_REDLOCK_MIN_CLIENTS} Redis clients"
             raise ValueError(msg)
         return Redlock(redis_clients, key, ttl=ttl, **kwargs)  # type: ignore[arg-type]
 

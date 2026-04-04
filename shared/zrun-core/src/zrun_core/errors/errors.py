@@ -73,6 +73,10 @@ class InternalError(DomainError):
     """Raised when an internal error occurs."""
 
 
+class InfrastructureError(DomainError):
+    """Raised when an infrastructure dependency fails (e.g., external API, JWKS fetch)."""
+
+
 def map_error_to_grpc_status(error: Exception) -> grpc.StatusCode:
     """Map a domain error to the appropriate gRPC status code.
 
@@ -96,6 +100,8 @@ def map_error_to_grpc_status(error: Exception) -> grpc.StatusCode:
         return grpc.StatusCode.RESOURCE_EXHAUSTED
     if isinstance(error, BusinessError):
         return grpc.StatusCode.FAILED_PRECONDITION
+    if isinstance(error, InfrastructureError):
+        return grpc.StatusCode.UNAVAILABLE
     if isinstance(error, DomainError):
         return grpc.StatusCode.FAILED_PRECONDITION
     if isinstance(error, grpc.RpcError):

@@ -35,22 +35,40 @@ class BFFConfig(ServiceConfig):
 
     # Casdoor OAuth2 Configuration
     casdoor_client_id: str = ""
-    casdoor_client_secret: str = ""
+    casdoor_client_secret: str = ""  # noqa: S105
     casdoor_redirect_uri: str = "http://localhost:8000/auth/callback"
     casdoor_authorization_endpoint: str = "http://localhost:8080/api/oauth/authorize"
-    casdoor_token_endpoint: str = "http://localhost:8080/api/oauth/token"
+    casdoor_token_endpoint: str = "http://localhost:8080/api/oauth/token"  # noqa: S105
+
+    # OAuth2 Settings
+    oauth_state_bytes: int = 32  # Cryptographically secure state parameter size
+    oauth_scope: str = "openid profile email"  # OAuth2 scope for Casdoor
+    default_scopes: str = "pda:read pda:write"  # Default scopes for internal JWT
+
+    # Note: oauth_scope and default_scopes use string literals for pydantic-settings compatibility.
+    # Use OAuthScope.default() and InternalScope.default() from constants module in code.
 
     # JWT Signing Configuration
     jwt_private_key_path: str = ""
+    jwt_public_key_path: str = ""  # Path to public key for token verification
     jwt_key_id: str = "key-1"  # JWKS key ID for rotation support
     jwt_key_version: str = "v1"  # Key version for rotation tracking
     jwt_issuer: str = "zrun-bff"
     jwt_audience: str = "zrun-services"
-    jwt_expiration_seconds: int = 3600
+    jwt_expiration_seconds: int = 3600  # 1 hour
+    jwt_refresh_expiration_seconds: int = 2592000  # 30 days
 
     # API Configuration
     api_prefix: str = "/api"
     cors_origins: list[str] = ["http://localhost:3000"]
+
+    # Session Configuration
+    session_secret_key: str = "change-this-in-production"  # noqa: S105
+
+    # gRPC Service URLs
+    base_service_url: str = "localhost:50051"
+    ops_service_url: str = "localhost:50052"
+    stock_service_url: str = "localhost:50053"
 
     @property
     def jwt_private_key(self) -> str:
@@ -71,6 +89,26 @@ class BFFConfig(ServiceConfig):
         return path.read_text()
 
     @property
+    def jwt_public_key(self) -> str:
+        """Read and return JWT public key content.
+
+        Returns:
+            Public key content as string.
+        """
+        if not self.jwt_public_key_path:
+            # Fallback: derive public key from private key
+            from zrun_bff.jwt.token import get_public_key_pem
+
+            return get_public_key_pem(self.jwt_private_key)
+
+        path = Path(self.jwt_public_key_path)
+        if not path.exists():
+            msg = f"JWT public key not found: {self.jwt_public_key_path}"
+            raise FileNotFoundError(msg)
+
+        return path.read_text()
+
+    @property
     def casdoor_authorize_url(self) -> str:
         """Generate Casdoor authorization URL.
 
@@ -79,10 +117,12 @@ class BFFConfig(ServiceConfig):
         """
         from urllib.parse import urlencode
 
+        from zrun_bff.auth.constants import OAuthScope
+
         params = {
             "client_id": self.casdoor_client_id,
             "redirect_uri": self.casdoor_redirect_uri,
             "response_type": "code",
-            "scope": "openid profile email",
+            "scope": OAuthScope.default(),
         }
         return f"{self.casdoor_authorization_endpoint}?{urlencode(params)}"

@@ -8,6 +8,7 @@ from zrun_core.errors.errors import (
     BusinessError,
     ConflictError,
     DomainError,
+    InfrastructureError,
     InternalError,
     NotFoundError,
     RateLimitError,
@@ -26,6 +27,7 @@ __all__ = [
     "AuthorizationError",
     "BusinessError",
     "RateLimitError",
+    "InfrastructureError",
     "InternalError",
     # Error utilities
     "map_error_to_grpc_status",

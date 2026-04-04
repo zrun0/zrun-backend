@@ -160,3 +160,6 @@ shared/zrun-schema/src/zrun_schema/generated/
 
 # Serena
 .serena/
+
+# AI working drafts (REFACTORING_SUMMARY.md, PLAN.md, etc.)
+.ai-drafts/

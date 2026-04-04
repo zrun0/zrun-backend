@@ -103,7 +103,7 @@ def get_public_key_pem(private_key_pem: str) -> str:
 
         # Try to use cryptography backend if available
         if hasattr(public_key, "_prepared_key"):
-            from cryptography.hazmat.primitives import serialization  # type: ignore[import-untyped]
+            from cryptography.hazmat.primitives import serialization
 
             return public_key._prepared_key.public_bytes(
                 encoding=serialization.Encoding.PEM,
@@ -112,8 +112,8 @@ def get_public_key_pem(private_key_pem: str) -> str:
 
         # Fallback: construct from public key JWK
         # Reconstruct public key from JWK components
-        from cryptography.hazmat.backends import default_backend  # type: ignore[import-untyped]
-        from cryptography.hazmat.primitives import serialization  # type: ignore[import-untyped]
+        from cryptography.hazmat.backends import default_backend
+        from cryptography.hazmat.primitives import serialization
 
         # Note: This is a simplified fallback
         # In production, ensure cryptography is properly installed
@@ -124,11 +124,6 @@ def get_public_key_pem(private_key_pem: str) -> str:
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo,
         ).decode("utf-8")
-    except ImportError:
-        # cryptography not available, use fallback
-        # Return the private key for testing (not production safe)
-        logger.warning("cryptography_not_available", fallback="private_key")
-        return private_key_pem
     except Exception as e:
         msg = f"Failed to extract public key: {e}"
         logger.error("public_key_extraction_failed", error=str(e))
