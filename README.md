@@ -16,6 +16,7 @@ zrun-backend/
 │   ├── zrun-stock/         # Stock management service
 │   ├── zrun-ops/           # Operations service
 │   ├── zrun-integration/   # Third-party integrations
+│   ├── zrun-bff/           # Backend For Frontend (OAuth2 + JWT re-issuance)
 │   └── zrun-analytics/     # Analytics service
 ```
 
