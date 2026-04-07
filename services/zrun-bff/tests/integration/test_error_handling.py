@@ -56,6 +56,30 @@ class TestGrpcToHttpMapping:
         """Test CANCELLED maps to 499."""
         assert map_grpc_to_http(StatusCode.CANCELLED) == 499
 
+    def test_failed_precondition_maps_to_400(self) -> None:
+        """Test FAILED_PRECONDITION maps to 400."""
+        assert map_grpc_to_http(StatusCode.FAILED_PRECONDITION) == 400
+
+    def test_out_of_range_maps_to_400(self) -> None:
+        """Test OUT_OF_RANGE maps to 400."""
+        assert map_grpc_to_http(StatusCode.OUT_OF_RANGE) == 400
+
+    def test_deadline_exceeded_maps_to_504(self) -> None:
+        """Test DEADLINE_EXCEEDED maps to 504."""
+        assert map_grpc_to_http(StatusCode.DEADLINE_EXCEEDED) == 504
+
+    def test_resource_exhausted_maps_to_429(self) -> None:
+        """Test RESOURCE_EXHAUSTED maps to 429."""
+        assert map_grpc_to_http(StatusCode.RESOURCE_EXHAUSTED) == 429
+
+    def test_unimplemented_maps_to_501(self) -> None:
+        """Test UNIMPLEMENTED maps to 501."""
+        assert map_grpc_to_http(StatusCode.UNIMPLEMENTED) == 501
+
+    def test_data_loss_maps_to_500(self) -> None:
+        """Test DATA_LOSS maps to 500."""
+        assert map_grpc_to_http(StatusCode.DATA_LOSS) == 500
+
 
 class TestBFFErrors:
     """Tests for BFF-specific error classes."""
@@ -141,6 +165,36 @@ class TestGrpcErrorConversion:
     def test_unknown_status_maps_correctly(self) -> None:
         """Test UNKNOWN status maps to 500 via map function."""
         http_status = map_grpc_to_http(StatusCode.UNKNOWN)
+        assert http_status == 500
+
+    def test_failed_precondition_status_maps_correctly(self) -> None:
+        """Test FAILED_PRECONDITION status maps to 400 via map function."""
+        http_status = map_grpc_to_http(StatusCode.FAILED_PRECONDITION)
+        assert http_status == 400
+
+    def test_out_of_range_status_maps_correctly(self) -> None:
+        """Test OUT_OF_RANGE status maps to 400 via map function."""
+        http_status = map_grpc_to_http(StatusCode.OUT_OF_RANGE)
+        assert http_status == 400
+
+    def test_deadline_exceeded_status_maps_correctly(self) -> None:
+        """Test DEADLINE_EXCEEDED status maps to 504 via map function."""
+        http_status = map_grpc_to_http(StatusCode.DEADLINE_EXCEEDED)
+        assert http_status == 504
+
+    def test_resource_exhausted_status_maps_correctly(self) -> None:
+        """Test RESOURCE_EXHAUSTED status maps to 429 via map function."""
+        http_status = map_grpc_to_http(StatusCode.RESOURCE_EXHAUSTED)
+        assert http_status == 429
+
+    def test_unimplemented_status_maps_correctly(self) -> None:
+        """Test UNIMPLEMENTED status maps to 501 via map function."""
+        http_status = map_grpc_to_http(StatusCode.UNIMPLEMENTED)
+        assert http_status == 501
+
+    def test_data_loss_status_maps_correctly(self) -> None:
+        """Test DATA_LOSS status maps to 500 via map function."""
+        http_status = map_grpc_to_http(StatusCode.DATA_LOSS)
         assert http_status == 500
 
     def test_generic_exception_converts_to_internal_error(self) -> None:

@@ -120,29 +120,3 @@ def build_auth_metadata() -> Metadata:
         metadata.append(("x-scopes", ",".join(scopes)))
 
     return metadata
-
-
-async def call_with_auth(
-    stub_method: Any,
-    request: Any,
-) -> Any:
-    """Call a gRPC method with authentication metadata.
-
-    This is a convenience wrapper that automatically adds authentication
-    metadata from the current user context.
-
-    Args:
-        stub_method: The gRPC stub method to call.
-        request: The request message.
-
-    Returns:
-        The response from the gRPC call.
-
-    Example:
-        ```python
-        stub = MyServiceStub(channel)
-        response = await call_with_auth(stub.MyMethod, request)
-        ```
-    """
-    metadata = build_auth_metadata()
-    return await stub_method(request, metadata=metadata)

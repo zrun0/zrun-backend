@@ -184,7 +184,9 @@ class TestE2EOAuthStateFlow:
         # First callback with proper mocking
         with (
             patch("httpx.AsyncClient"),
-            patch("zrun_bff.auth.utils.verify_casdoor_token", return_value={"sub": "user123"}),
+            patch(
+                "zrun_bff.auth.router.verify_casdoor_token_async", return_value={"sub": "user123"}
+            ),
         ):
             client.get(
                 f"/auth/callback?code=auth_code_123&state={state}",

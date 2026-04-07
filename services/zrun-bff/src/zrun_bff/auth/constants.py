@@ -29,11 +29,26 @@ class OAuthScope(StrEnum):
         return f"{cls.OPENID} {cls.PROFILE} {cls.EMAIL}"
 
 
-class InternalScope(StrEnum):
-    """Internal JWT scopes for microservices."""
+class Scope(StrEnum):
+    """Internal JWT scopes for microservices.
 
+    Scopes are included in JWT tokens and checked by authorization dependencies.
+    Format: resource:action (e.g., "pda:read" for PDA service read access).
+    """
+
+    # PDA service scopes
     PDA_READ = "pda:read"
     PDA_WRITE = "pda:write"
+
+    # Web client scopes
+    WEB_ADMIN = "web:admin"
+    WEB_READ = "web:read"
+
+    # Mini client scopes
+    MINI_READ = "mini:read"
+
+    # Admin scopes
+    ADMIN_ALL = "admin:all"
 
     @classmethod
     def default(cls) -> str:

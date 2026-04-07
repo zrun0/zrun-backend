@@ -9,7 +9,6 @@ channel management across all services.
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import TYPE_CHECKING
 
 from structlog import get_logger
@@ -17,21 +16,11 @@ from structlog import get_logger
 if TYPE_CHECKING:
     import grpc.aio
 
-from zrun_bff.config import BFFConfig
+from zrun_bff.config import BFFConfig, get_config
 from zrun_core.grpc import GrpcClientManager as CoreGrpcClientManager
 from zrun_core.grpc import GrpcChannelConfig
 
 logger = get_logger()
-
-
-@lru_cache
-def _get_config() -> BFFConfig:
-    """Get cached BFF configuration.
-
-    Returns:
-        BFF configuration instance.
-    """
-    return BFFConfig()
 
 
 class GrpcClientManager:
@@ -65,7 +54,7 @@ class GrpcClientManager:
         Returns:
             Active gRPC channel for zrun-base service.
         """
-        config = _get_config()
+        config = get_config()
         return await self._core_manager.get_channel(config.base_service_url)
 
     async def get_ops_channel(self) -> grpc.aio.Channel:
@@ -74,7 +63,7 @@ class GrpcClientManager:
         Returns:
             Active gRPC channel for zrun-ops service.
         """
-        config = _get_config()
+        config = get_config()
         return await self._core_manager.get_channel(config.ops_service_url)
 
     async def get_stock_channel(self) -> grpc.aio.Channel:
@@ -83,7 +72,7 @@ class GrpcClientManager:
         Returns:
             Active gRPC channel for zrun-stock service.
         """
-        config = _get_config()
+        config = get_config()
         return await self._core_manager.get_channel(config.stock_service_url)
 
     async def release_channel(self, target: str) -> None:

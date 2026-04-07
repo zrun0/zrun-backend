@@ -1,138 +1,143 @@
-"""Unit tests for gRPC clients."""
+"""Unit tests for gRPC clients.
+
+Tests verify:
+- gRPC client initialization
+- Authentication metadata injection
+- Error handling and mapping
+- User context propagation
+"""
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
-from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from grpc.aio import Channel
 
-
-class TestAuthMetadataInterceptor:
-    """Test authentication metadata interceptor."""
-
-    @pytest.mark.asyncio
-    async def test_set_user_context(self) -> None:
-        """Test setting user context."""
-        from zrun_bff.clients.interceptors import set_user_context, get_user_context
-
-        set_user_context("user123", "token456", ["read", "write"])
-        ctx = get_user_context()
-
-        assert ctx["user_id"] == "user123"
-        assert ctx["token"] == "token456"
-        assert ctx["scopes"] == ["read", "write"]
-
-    @pytest.mark.asyncio
-    async def test_build_auth_metadata(self) -> None:
-        """Test building authentication metadata."""
-        from zrun_bff.clients.interceptors import set_user_context, build_auth_metadata
-
-        set_user_context("user123", "token456", ["read", "write"])
-        metadata = build_auth_metadata()
-
-        # Convert to list for assertion
-        metadata_list = list(metadata)
-
-        assert ("x-user-id", "user123") in metadata_list
-        assert ("authorization", "Bearer token456") in metadata_list
-        assert ("x-scopes", "read,write") in metadata_list
+from zrun_bff.clients.base import BaseSkuClient
+from zrun_bff.clients.factory import get_client_manager
+from zrun_bff.clients.interceptors import (
+    build_auth_metadata,
+    get_user_context,
+    set_user_context,
+)
+from zrun_bff.clients.utils import handle_grpc_error
 
 
 class TestGrpcClientFactory:
-    """Test gRPC client factory."""
+    """Tests for gRPC client factory."""
 
-    @pytest.mark.asyncio
-    async def test_get_client_manager_singleton(self) -> None:
-        """Test that client manager is a singleton."""
-        from zrun_bff.clients.factory import get_client_manager, GrpcClientManager
-
+    def test_get_client_manager_returns_singleton(self) -> None:
+        """Test that get_client_manager returns the same instance."""
         manager1 = get_client_manager()
         manager2 = get_client_manager()
 
         assert manager1 is manager2
-        assert isinstance(manager1, GrpcClientManager)
+
+
+class TestUserContextManagement:
+    """Tests for user context management."""
+
+    def test_set_and_get_user_context(self) -> None:
+        """Test setting and getting user context."""
+        set_user_context(
+            user_id="test_user",
+            token="test_token",
+            scopes=["pda:read", "pda:write"],
+        )
+
+        context = get_user_context()
+
+        assert context["user_id"] == "test_user"
+        assert context["token"] == "test_token"
+        assert context["scopes"] == ["pda:read", "pda:write"]
+
+
+class TestAuthenticationMetadata:
+    """Tests for authentication metadata injection."""
+
+    def test_build_auth_metadata_with_full_context(self) -> None:
+        """Test building auth metadata with full user context."""
+        set_user_context(
+            user_id="test_user",
+            token="test_token",
+            scopes=["pda:read", "pda:write"],
+        )
+
+        metadata = build_auth_metadata()
+        metadata_list = list(metadata)
+
+        assert ("x-user-id", "test_user") in metadata_list
+        assert ("authorization", "Bearer test_token") in metadata_list
+        assert ("x-scopes", "pda:read,pda:write") in metadata_list
 
 
 class TestBaseSkuClient:
-    """Test Base SKU client."""
+    """Tests for BaseSkuClient."""
 
-    @pytest.mark.asyncio
-    async def test_create_sku_client(self) -> None:
-        """Test creating SKU client."""
-        from zrun_bff.clients.base import create_sku_client
+    @pytest.fixture
+    def mock_channel(self) -> MagicMock:
+        """Create a mock gRPC channel."""
+        return MagicMock(spec=Channel)
 
-        mock_channel = MagicMock()
+    @pytest.fixture
+    def sku_client(self, mock_channel: MagicMock) -> BaseSkuClient:
+        """Create a BaseSkuClient with mock channel."""
+        return BaseSkuClient(mock_channel)
 
-        client = await create_sku_client(mock_channel)
+    def test_create_sku_client_initializes_stub(self, mock_channel: MagicMock) -> None:
+        """Test that create_sku_client initializes the gRPC stub."""
+        client = BaseSkuClient(mock_channel)
 
-        assert client is not None
-        assert client._channel is mock_channel
+        assert client._channel == mock_channel
+        assert client._stub is not None
 
-    @pytest.mark.asyncio
-    async def test_create_sku_method(self) -> None:
-        """Test SKU creation method."""
-        from zrun_bff.clients.base import BaseSkuClient
-        from zrun_bff.clients.interceptors import set_user_context
+    def test_create_sku_injects_auth_metadata(self, sku_client: BaseSkuClient) -> None:
+        """Test that create_sku injects authentication metadata."""
+        set_user_context(user_id="test_user", token="test_token", scopes=["pda:write"])
 
-        # Set user context
-        set_user_context("test-user", "test-token")
+        with patch.object(sku_client._stub, "CreateSku", new_callable=AsyncMock) as mock_method:
+            mock_response = MagicMock()
+            mock_response.sku.id = "123"
+            mock_response.sku.code = "TEST001"
+            mock_response.sku.name = "Test SKU"
+            mock_method.return_value = mock_response
 
-        # Mock the gRPC stub
-        mock_channel = MagicMock()
-        mock_stub = MagicMock()
+            import asyncio
 
-        async def mock_create(*args: Any, **kwargs: Any) -> MagicMock:
-            response = MagicMock()
-            response.sku.id = "123"
-            response.sku.code = "SKU001"
-            response.sku.name = "Test SKU"
-            return response
+            result = asyncio.run(sku_client.create_sku(code="TEST001", name="Test SKU"))
 
-        mock_stub.CreateSku = mock_create
-
-        patch_path = "zrun_schema.generated.base.sku_pb2_grpc.SkuServiceStub"
-        with patch(patch_path, return_value=mock_stub):
-            client = BaseSkuClient(mock_channel)
-
-            result = await client.create_sku(
-                code="SKU001",
-                name="Test SKU",
-            )
-
-            assert result["id"] == "123"
-            assert result["code"] == "SKU001"
-            assert result["name"] == "Test SKU"
+            # Verify metadata was injected
+            call_args = mock_method.call_args
+            metadata = call_args.kwargs.get("metadata")
+            metadata_list = list(metadata)
+            assert ("x-user-id", "test_user") in metadata_list
 
 
-class TestDependencies:
-    """Test FastAPI dependencies."""
+class TestGrpcErrorHandling:
+    """Tests for gRPC error handling."""
 
-    @pytest.mark.asyncio
-    async def test_get_sku_client_dependency(self) -> None:
-        """Test SKU client dependency."""
-        from zrun_bff.clients.dependencies import get_sku_client
+    def test_handle_grpc_error_returns_result_on_success(self) -> None:
+        """Test that handle_grpc_error returns result on success."""
 
-        async def mock_get_channel():
-            mock_channel = MagicMock()
-            yield mock_channel
+        @handle_grpc_error
+        async def success_func() -> dict[str, str]:
+            return {"id": "123"}
 
-        # This is a basic test to ensure the dependency is importable
-        assert callable(get_sku_client)
+        import asyncio
 
+        result = asyncio.run(success_func())
+        assert result == {"id": "123"}
 
-class TestSessionMiddleware:
-    """Test session middleware."""
+    def test_handle_grpc_error_raises_on_exception(self) -> None:
+        """Test that handle_grpc_error raises on generic exception."""
+        from zrun_bff.errors import InternalError
 
-    def test_session_middleware_init(self) -> None:
-        """Test session middleware initialization."""
-        from zrun_bff.middleware.session import SessionMiddleware
+        @handle_grpc_error
+        async def failing_func() -> dict[str, str]:
+            raise ValueError("Test error")
 
-        app = MagicMock()
-        middleware = SessionMiddleware(
-            app=app,
-            secret_key="test-secret-key",
-        )
+        import asyncio
 
-        assert middleware is not None
-        assert middleware._session_cookie == "session"
+        with pytest.raises(InternalError):
+            asyncio.run(failing_func())

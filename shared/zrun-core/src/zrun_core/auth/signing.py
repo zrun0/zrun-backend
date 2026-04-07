@@ -1,25 +1,16 @@
-"""JWT token generation and validation utilities for BFF service.
+"""JWT token signing utilities for internal services.
 
-This module provides RS256-based JWT signing using private keys configured
-via BFFConfig. Supports internal JWT re-issuance after Casdoor validation.
-
-Security:
-- Uses RS256 (asymmetric encryption) for token signing
-- Private key never leaves the BFF service
-- Public key exposed via JWKS endpoint for internal services
+This module provides JWT generation and JWKS building capabilities
+for services that need to issue internal JWT tokens.
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from jose import jwk, jwt
-from jose.exceptions import JWTError
 from structlog import get_logger
-
-if TYPE_CHECKING:
-    from typing import Any
 
 logger = get_logger()
 
@@ -98,32 +89,18 @@ def get_public_key_pem(private_key_pem: str) -> str:
         ValueError: If private_key_pem is invalid.
     """
     try:
-        private_key = jwk.construct(private_key_pem, algorithm="RS256")
-        public_key = private_key.public_key()
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
-        # Try to use cryptography backend if available
-        if hasattr(public_key, "_prepared_key"):
-            from cryptography.hazmat.primitives import serialization
-
-            return public_key._prepared_key.public_bytes(
+        private_key = load_pem_private_key(private_key_pem.encode(), password=None)
+        return (
+            private_key.public_key()
+            .public_bytes(
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PublicFormat.SubjectPublicKeyInfo,
-            ).decode("utf-8")
-
-        # Fallback: construct from public key JWK
-        # Reconstruct public key from JWK components
-        from cryptography.hazmat.backends import default_backend
-        from cryptography.hazmat.primitives import serialization
-
-        # Note: This is a simplified fallback
-        # In production, ensure cryptography is properly installed
-        numbers = serialization.load_pem_public_key(
-            private_key_pem.encode(), backend=default_backend()
+            )
+            .decode("utf-8")
         )
-        return numbers.public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        ).decode("utf-8")
     except Exception as e:
         msg = f"Failed to extract public key: {e}"
         logger.error("public_key_extraction_failed", error=str(e))
@@ -193,7 +170,7 @@ def decode_token(
     """Decode and validate JWT token using public key.
 
     This is primarily used for testing and debugging. Production services
-    should use the JWKS-based validation in zrun-core.auth.AuthInterceptor.
+    should use the JWKS-based validation in zrun_core.auth.AuthInterceptor.
 
     Args:
         token: JWT token string.
@@ -204,6 +181,8 @@ def decode_token(
     Returns:
         Decoded token payload if valid, None otherwise.
     """
+    from jose.exceptions import JWTError
+
     try:
         payload = jwt.decode(
             token=token,
@@ -217,3 +196,12 @@ def decode_token(
     except JWTError as e:
         logger.warning("jwt_decode_failed", error=str(e))
         return None
+
+
+__all__ = [
+    "generate_token",
+    "get_public_key",
+    "get_public_key_pem",
+    "build_jwks",
+    "decode_token",
+]

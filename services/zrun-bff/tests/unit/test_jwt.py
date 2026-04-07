@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from zrun_bff.jwt import build_jwks
+from zrun_core.auth import build_jwks
 
 
 class TestBuildJwks:
@@ -88,7 +88,7 @@ class TestScopeConstants:
 
     def test_scope_values_are_strings(self) -> None:
         """Test that scope values are valid strings."""
-        from zrun_bff.auth.dependencies import Scope
+        from zrun_bff.auth.constants import Scope
 
         assert isinstance(Scope.PDA_READ, str)
         assert isinstance(Scope.PDA_WRITE, str)
@@ -99,7 +99,7 @@ class TestScopeConstants:
 
     def test_scope_format(self) -> None:
         """Test that scope values follow OAuth2 format."""
-        from zrun_bff.auth.dependencies import Scope
+        from zrun_bff.auth.constants import Scope
 
         # Scopes should be in format "resource:action"
         for scope in [Scope.PDA_READ, Scope.PDA_WRITE, Scope.WEB_ADMIN, Scope.WEB_READ]:

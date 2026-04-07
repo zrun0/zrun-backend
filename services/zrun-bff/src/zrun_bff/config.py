@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 
 from pydantic_settings import SettingsConfigDict
@@ -97,7 +98,7 @@ class BFFConfig(ServiceConfig):
         """
         if not self.jwt_public_key_path:
             # Fallback: derive public key from private key
-            from zrun_bff.jwt.token import get_public_key_pem
+            from zrun_core.auth import get_public_key_pem
 
             return get_public_key_pem(self.jwt_private_key)
 
@@ -126,3 +127,22 @@ class BFFConfig(ServiceConfig):
             "scope": OAuthScope.default(),
         }
         return f"{self.casdoor_authorization_endpoint}?{urlencode(params)}"
+
+
+@lru_cache
+def get_config() -> BFFConfig:
+    """Get cached BFF configuration instance.
+
+    This is the centralized configuration getter for the entire BFF service.
+    All other modules should import and use this function instead of
+    defining their own get_config() wrappers.
+
+    Returns:
+        Cached BFFConfig instance loaded from environment.
+
+    Example:
+        >>> from zrun_bff.config import get_config
+        >>> config = get_config()
+        >>> print(config.casdoor_client_id)
+    """
+    return BFFConfig()

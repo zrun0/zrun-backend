@@ -26,16 +26,8 @@ zrun-bff = "zrun_bff.main:main"
 dev = [
     "pytest",
     "pytest-asyncio",
+    "pytest-benchmark>=4.0.0",
     "httpx",
-]
-
-# Optional dependencies for different key providers
-[project.optional-dependencies]
-vault = [
-    "hvac>=2.0.0",
-]
-k8s = [
-    "kubernetes>=28.0.0",
 ]
 
 [tool.uv.sources]
@@ -48,3 +40,7 @@ packages = ["src/zrun_bff"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+filterwarnings = [
+    # Ignore DeprecationWarning from python-jose library (uses datetime.utcnow())
+    "ignore::DeprecationWarning:jose",
+]

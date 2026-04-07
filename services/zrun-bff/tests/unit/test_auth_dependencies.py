@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from fastapi import HTTPException, status
-from zrun_bff.auth.dependencies import Scope
+
+from zrun_bff.auth.constants import Scope
 
 
 class TestScope:

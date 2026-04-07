@@ -2,12 +2,23 @@
 
 This module provides FastAPI dependency functions for injecting
 gRPC clients into route handlers.
+
+Note:
+    User context is automatically set by UserContextMiddleware in main.py.
+    The client dependencies below rely on the middleware for authentication
+    context propagation to gRPC services.
+
+Architecture:
+    Request → UserContextMiddleware → set_user_context()
+                                        ↓
+    Route Handler → Depends(get_sku_client) → BaseSkuClient
+                                            ↓
+    gRPC Call → build_auth_metadata() → [user_id, token, scopes]
 """
 
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator  # noqa: TC003
-from functools import lru_cache
 
 from fastapi import Depends
 from grpc.aio import Channel
@@ -15,23 +26,19 @@ from structlog import get_logger
 
 from zrun_bff.clients.base import BaseSkuClient, create_sku_client
 from zrun_bff.clients.factory import get_client_manager
-from zrun_bff.config import BFFConfig
+from zrun_bff.clients.interceptors import get_user_context
+from zrun_bff.config import BFFConfig, get_config
 
 logger = get_logger()
 
 
-@lru_cache
-def _get_config() -> BFFConfig:
-    """Get cached BFF configuration.
-
-    Returns:
-        BFF configuration instance.
-    """
-    return BFFConfig()
-
-
-async def get_base_channel() -> AsyncGenerator[Channel]:
+async def get_base_channel(
+    config: BFFConfig = Depends(get_config),
+) -> AsyncGenerator[Channel]:
     """Dependency that provides gRPC channel for Base service.
+
+    Args:
+        config: BFF configuration.
 
     Yields:
         Active gRPC channel for zrun-base service.
@@ -48,7 +55,6 @@ async def get_base_channel() -> AsyncGenerator[Channel]:
         ```
     """
     manager = get_client_manager()
-    config = _get_config()
     channel = await manager.get_base_channel()
     try:
         yield channel
@@ -60,6 +66,11 @@ async def get_sku_client(
     channel: Channel = Depends(get_base_channel),
 ) -> AsyncGenerator[BaseSkuClient]:
     """Dependency that provides Base SKU service client.
+
+    Note:
+        User context should be set by UserContextMiddleware before
+        this dependency is called. The client will automatically
+        use the context for gRPC metadata injection.
 
     Args:
         channel: gRPC channel injected by get_base_channel.
@@ -78,6 +89,12 @@ async def get_sku_client(
         ```
     """
     client = create_sku_client(channel)
+
+    # Log if user context is available (for debugging)
+    user_ctx = get_user_context()
+    if user_ctx:
+        logger.debug("sku_client_with_context", user_id=user_ctx.get("user_id", "")[:8] + "...")
+
     try:
         yield client
     finally:

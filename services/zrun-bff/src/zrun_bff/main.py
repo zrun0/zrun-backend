@@ -2,7 +2,6 @@
 
 import httpx
 from contextlib import asynccontextmanager
-from functools import lru_cache
 from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
@@ -10,29 +9,20 @@ from starlette.middleware.cors import CORSMiddleware
 from structlog import get_logger
 
 from zrun_bff.api.pda.sku import router as sku_router
+from zrun_bff.auth.middleware import UserContextMiddleware
 from zrun_bff.auth.router import router as auth_router
-from zrun_bff.config import BFFConfig
+from zrun_bff.config import BFFConfig, get_config
 from zrun_bff.errors import (
     BFFError,
     ErrorResponse,
     grpc_error_to_bff_error,
 )
-from zrun_bff.middleware.session import SessionMiddleware
+from zrun_bff.auth.middleware import SessionMiddleware
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 logger = get_logger()
-
-
-@lru_cache
-def get_config() -> BFFConfig:
-    """Get cached BFF configuration.
-
-    Returns:
-        BFF configuration instance.
-    """
-    return BFFConfig()
 
 
 @asynccontextmanager
@@ -102,6 +92,9 @@ def create_app(config: BFFConfig | None = None) -> FastAPI:
         same_site="lax",
         https_only=config.env == "production",
     )
+
+    # User context middleware for automatic gRPC auth propagation
+    app.add_middleware(UserContextMiddleware, config=config)  # type: ignore[arg-type]
 
     # Exception handlers
     from starlette.responses import JSONResponse

@@ -7,26 +7,22 @@ Architecture: Frontend -> BFF (OAuth2 with Casdoor) -> Internal JWT.
 from __future__ import annotations
 
 import secrets
-from functools import lru_cache
-from typing import TYPE_CHECKING
+from collections.abc import Mapping
 from urllib.parse import urlencode
 
 import httpx
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 from structlog import get_logger
 
-if TYPE_CHECKING:
-    from collections.abc import Mapping
-
 from zrun_bff.auth.constants import GrantType, TokenType
 from zrun_bff.auth.tokens import TokenPair, generate_token_pair, refresh_access_token
-from zrun_bff.auth.utils import verify_casdoor_token
-from zrun_bff.config import BFFConfig
+from zrun_bff.auth.casdoor import verify_casdoor_token_async
+from zrun_bff.config import BFFConfig, get_config
 from zrun_bff.errors import UnauthorizedError
-from zrun_bff.jwt import build_jwks, get_public_key
-from zrun_bff.middleware.session import get_session
+from zrun_core.auth import build_jwks, get_public_key
+from zrun_bff.auth.middleware import get_session
 
 logger = get_logger()
 
@@ -59,18 +55,11 @@ class TokenResponse(BaseModel):
 router = APIRouter()
 
 
-@lru_cache
-def get_config() -> BFFConfig:
-    """Get cached BFF configuration.
-
-    Returns:
-        BFF configuration instance.
-    """
-    return BFFConfig()
-
-
 @router.get("/auth/login")
-async def login_redirect(request: Request) -> RedirectResponse:
+async def login_redirect(
+    request: Request,
+    config: BFFConfig = Depends(get_config),
+) -> RedirectResponse:
     """Redirect to Casdoor OAuth2 authorization endpoint.
 
     Generates a secure state parameter for CSRF protection and stores
@@ -78,11 +67,11 @@ async def login_redirect(request: Request) -> RedirectResponse:
 
     Args:
         request: FastAPI request object.
+        config: BFF configuration.
 
     Returns:
         RedirectResponse to Casdoor login page with state parameter.
     """
-    config = get_config()
 
     # Generate cryptographically secure state parameter
     state = secrets.token_urlsafe(config.oauth_state_bytes)
@@ -110,6 +99,7 @@ async def oauth_callback(
     request: Request,
     code: str,
     state: str | None = None,
+    config: BFFConfig = Depends(get_config),
 ) -> Response:
     """OAuth2 callback endpoint.
 
@@ -120,6 +110,7 @@ async def oauth_callback(
         request: FastAPI request object.
         code: Authorization code from Casdoor.
         state: OAuth2 state parameter for CSRF protection.
+        config: BFF configuration.
 
     Returns:
         Response with internal JWT token in body.
@@ -127,7 +118,6 @@ async def oauth_callback(
     Raises:
         HTTPException: If token exchange fails or Casdoor token is invalid.
     """
-    config = get_config()
 
     # Verify state parameter for CSRF protection
     session = get_session(request)
@@ -192,7 +182,7 @@ async def oauth_callback(
 
     # Verify Casdoor token signature using JWKS
     try:
-        casdoor_payload = verify_casdoor_token(access_token, config)
+        casdoor_payload = await verify_casdoor_token_async(access_token, config)
     except ValueError as e:
         logger.error("casdoor_token_verification_failed", error=str(e))
         raise HTTPException(
@@ -232,6 +222,7 @@ async def oauth_callback(
 @router.post("/auth/refresh")
 async def refresh_token(
     request: TokenRefreshRequest,
+    config: BFFConfig = Depends(get_config),
 ) -> JSONResponse:
     """Refresh access token using refresh token.
 
@@ -240,6 +231,7 @@ async def refresh_token(
 
     Args:
         request: Refresh token request.
+        config: BFF configuration.
 
     Returns:
         JSON response with new access and refresh tokens.
@@ -247,7 +239,6 @@ async def refresh_token(
     Raises:
         UnauthorizedError: If refresh token is invalid or expired.
     """
-    config = get_config()
 
     # Generate new token pair
     try:
@@ -267,11 +258,16 @@ async def refresh_token(
 
 
 @router.get("/.well-known/jwks.json")
-async def jwks_endpoint() -> Mapping[str, object]:
+async def jwks_endpoint(
+    config: BFFConfig = Depends(get_config),
+) -> Mapping[str, object]:
     """JWKS endpoint for internal services.
 
     Exposes public key for JWT verification. Internal services use this
     endpoint to validate internal JWTs issued by BFF.
+
+    Args:
+        config: BFF configuration.
 
     Returns:
         JWKS dictionary with keys list.
@@ -280,7 +276,6 @@ async def jwks_endpoint() -> Mapping[str, object]:
         - Only contains public key, never private key
         - Caching recommended (TTL 300s)
     """
-    config = get_config()
 
     try:
         public_key = get_public_key(config.jwt_private_key)

@@ -8,7 +8,7 @@ Tests the complete OAuth2 flow with Casdoor, including:
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi import status
@@ -79,61 +79,46 @@ class TestJWTVerification:
     """Tests for JWT token verification."""
 
     def test_verify_casdoor_token_function_exists(self) -> None:
-        """Test that verify_casdoor_token function can be imported."""
-        from zrun_bff.auth.utils import verify_casdoor_token
+        """Test that verify_casdoor_token_async function can be imported."""
+        from zrun_bff.auth.casdoor import verify_casdoor_token_async
 
-        assert callable(verify_casdoor_token)
+        assert callable(verify_casdoor_token_async)
 
     def test_verify_casdoor_token_with_missing_key_id_raises_error(self) -> None:
         """Test that token without kid header raises ValueError."""
-        from zrun_bff.auth.utils import _verify_casdoor_token_async
+        from zrun_bff.auth.casdoor import verify_casdoor_token_async
         from zrun_bff.config import BFFConfig
+        from zrun_core.auth import JWTVerificationError
 
         config = BFFConfig()
 
-        # Mock the JWKS provider
-        with patch("zrun_bff.auth.utils.get_jwks_provider") as mock_jwks:
-            mock_provider = MagicMock()
-            mock_jwks.return_value = mock_provider
+        # Mock verify_jwt_with_jwks to raise error for missing kid
+        with patch("zrun_bff.auth.casdoor.verify_jwt_with_jwks") as mock_verify:
+            from zrun_core.auth import JWTVerificationError
 
-            async def mock_get_jwks():
-                return {"keys": []}
+            mock_verify.side_effect = JWTVerificationError("JWT header missing 'kid' claim")
 
-            mock_provider.get_jwks = mock_get_jwks
+            import asyncio
 
-            # Mock jwt.get_unverified_header to return no kid
-            with patch("zrun_bff.auth.utils.jwt.get_unverified_header", return_value={}):
-                import asyncio
-
-                with pytest.raises(ValueError, match="missing key ID"):
-                    asyncio.run(_verify_casdoor_token_async("invalid_token", config))
+            with pytest.raises(ValueError, match="missing.*kid"):
+                asyncio.run(verify_casdoor_token_async("invalid_token", config))
 
     def test_verify_casdoor_token_with_missing_kid_in_jwks_raises_error(self) -> None:
         """Test that token with kid not in JWKS raises ValueError."""
-        from zrun_bff.auth.utils import _verify_casdoor_token_async
+        from zrun_bff.auth.casdoor import verify_casdoor_token_async
         from zrun_bff.config import BFFConfig
+        from zrun_core.auth import JWTVerificationError
 
         config = BFFConfig()
 
-        # Mock the JWKS provider
-        with patch("zrun_bff.auth.utils.get_jwks_provider") as mock_jwks:
-            mock_provider = MagicMock()
-            mock_jwks.return_value = mock_provider
+        # Mock verify_jwt_with_jwks to raise error for key not found
+        with patch("zrun_bff.auth.casdoor.verify_jwt_with_jwks") as mock_verify:
+            mock_verify.side_effect = JWTVerificationError("Key not found in JWKS: test_key")
 
-            async def mock_get_jwks():
-                # Return JWKS with different key ID
-                return {"keys": [{"kid": "different_key"}]}
+            import asyncio
 
-            mock_provider.get_jwks = mock_get_jwks
-
-            # Mock jwt.get_unverified_header
-            with patch(
-                "zrun_bff.auth.utils.jwt.get_unverified_header", return_value={"kid": "test_key"}
-            ):
-                import asyncio
-
-                with pytest.raises(ValueError, match="Key ID.*not found in JWKS"):
-                    asyncio.run(_verify_casdoor_token_async("invalid_token", config))
+            with pytest.raises(ValueError, match="Key not found in JWKS"):
+                asyncio.run(verify_casdoor_token_async("invalid_token", config))
 
 
 class TestTokenRefresh:
@@ -384,13 +369,13 @@ class TestSessionMiddleware:
 
     def test_session_middleware_invalid_signature_returns_empty_session(self) -> None:
         """Test that invalid session signature returns empty session."""
-        from zrun_bff.middleware.session import SessionMiddleware
+        from zrun_bff.auth.middleware import SessionMiddleware
         from starlette.applications import Starlette
         from starlette.responses import JSONResponse
         from starlette.requests import Request
 
         async def dummy_app(request: Request) -> JSONResponse:
-            from zrun_bff.middleware.session import get_session
+            from zrun_bff.auth.middleware import get_session
 
             session = get_session(request)
             return JSONResponse({"session": session})

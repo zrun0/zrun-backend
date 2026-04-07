@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from zrun_bff.config import BFFConfig
 
 from zrun_bff.auth.constants import InternalTokenType, TokenType
-from zrun_bff.jwt.token import generate_token
+from zrun_core.auth import generate_token
 
 logger = get_logger()
 

@@ -14,7 +14,6 @@ from zrun_bff.clients.dependencies import (
 from zrun_bff.clients.factory import GrpcClientManager, get_client_manager
 from zrun_bff.clients.interceptors import (
     build_auth_metadata,
-    call_with_auth,
     get_user_context,
     set_user_context,
     user_context_scope,
@@ -35,7 +34,6 @@ __all__ = [
     "get_client_manager",
     # Interceptors
     "build_auth_metadata",
-    "call_with_auth",
     "get_user_context",
     "set_user_context",
     "user_context_scope",
